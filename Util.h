@@ -1,6 +1,8 @@
 #pragma once
 
 #include <concepts>
+#include <array>
+#include <vector>
 
 template<std::invocable F>
 struct ScopeExit {
