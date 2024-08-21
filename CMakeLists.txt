@@ -1,16 +1,13 @@
-﻿# CMakeList.txt : CMake project for BachThesis, include source and define
-# project specific logic here.
-#
-cmake_minimum_required (VERSION 3.12)
-set(CXX_STANDARD 20)
+﻿cmake_minimum_required (VERSION 3.24)
 
-# Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
 project ("BachThesis")
+set(CMAKE_CXX_STANDARD_REQUIRED 20)
+set(CMAKE_CXX_STANDARD 20)
 
 include(FindVulkan)
 
@@ -33,6 +30,6 @@ add_library(imgui_lib "submodules/imgui/imgui.cpp" "submodules/imgui/imgui_demo.
 target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
 
-add_executable(BachThesis "BachThesis.cpp" "BachThesis.h")
+add_executable(BachThesis "BachThesis.cpp" )
 target_link_libraries(BachThesis PUBLIC imgui_lib)
 
