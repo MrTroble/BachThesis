@@ -13,7 +13,8 @@ struct IContext {
     vk::PhysicalDevice physicalDevice;
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties;
     uint32_t primaryFamilyIndex;
-    // Queue Creation
+    // Surface
+    vk::SurfaceKHR surface;
 };
 
 int main()
@@ -30,7 +31,7 @@ int main()
     const auto listOfExtensions = glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
     IContext icontext;
 
-    std::array layers{ "VK_LAYER_KHRONOS_validation" };
+    const std::array layers{ "VK_LAYER_KHRONOS_validation" };
 
     const vk::InstanceCreateInfo createInstanceInfo({}, &applicationInfo, layers.size(), layers.data(),
         instanceExtensionCount, listOfExtensions);
@@ -57,19 +58,27 @@ int main()
             break;
     }
 
-    std::array queuePriorities{ 1.0f };
-    vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
+    const std::array queuePriorities{ 1.0f };
+    const vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
 
-    vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo);
+    const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
 
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
     if (!window)
     {
         std::cerr << "GLFW could not init!" << std::endl;
         return -1;
     }
+
+    const vk::Result result = (vk::Result)glfwCreateWindowSurface(icontext.instance, window, nullptr, (VkSurfaceKHR*)&icontext.surface);
+    if (result != vk::Result::eSuccess) {
+        std::cerr << "GLFW Surface creation failed! With VkResult " << vk::to_string(result) << std::endl;
+        return -1;
+    }
+    const ScopeExit cleanSurface([&]() { icontext.instance.destroySurfaceKHR(icontext.surface); });
 
 
     while (!glfwWindowShouldClose(window))
