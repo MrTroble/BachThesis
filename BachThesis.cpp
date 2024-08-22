@@ -15,6 +15,9 @@ struct IContext {
     uint32_t primaryFamilyIndex;
     // Surface
     vk::SurfaceKHR surface;
+    // Swapchain
+    vk::SwapchainKHR swapchain;
+    vk::Extent2D currentExtent;
 };
 
 int main()
@@ -61,12 +64,16 @@ int main()
     const std::array queuePriorities{ 1.0f };
     const vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
 
-    const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo);
+    const std::array extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
 
+    icontext.currentExtent = vk::Extent2D{ 640u, 480u };
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(icontext.currentExtent.width, icontext.currentExtent.height,
+        applicationInfo.pApplicationName, NULL, NULL);
     if (!window)
     {
         std::cerr << "GLFW could not init!" << std::endl;
@@ -80,6 +87,11 @@ int main()
     }
     const ScopeExit cleanSurface([&]() { icontext.instance.destroySurfaceKHR(icontext.surface); });
 
+    const std::array queueFamiliesInSwapchain = { icontext.primaryFamilyIndex };
+    const vk::SwapchainCreateInfoKHR swapchainCreateInfo({}, icontext.surface, 3, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear, icontext.currentExtent, 
+            1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, queueFamiliesInSwapchain);
+    icontext.swapchain = icontext.device.createSwapchainKHR(swapchainCreateInfo);
+    const ScopeExit cleanSwapchain([&]() { icontext.device.destroySwapchainKHR(icontext.swapchain); });
 
     while (!glfwWindowShouldClose(window))
     {
