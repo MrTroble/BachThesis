@@ -18,7 +18,18 @@ struct IContext {
     // Swapchain
     vk::SwapchainKHR swapchain;
     vk::Extent2D currentExtent;
+    std::vector<vk::Image> swapchainImages;
 };
+
+inline void recreateSwapchain(IContext& icontext) {
+    if (icontext.swapchain)
+        icontext.device.destroySwapchainKHR(icontext.swapchain);
+    const std::array queueFamiliesInSwapchain = { icontext.primaryFamilyIndex };
+    const vk::SwapchainCreateInfoKHR swapchainCreateInfo({}, icontext.surface, 3, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear, icontext.currentExtent,
+        1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, queueFamiliesInSwapchain);
+    icontext.swapchain = icontext.device.createSwapchainKHR(swapchainCreateInfo);
+    icontext.swapchainImages = icontext.device.getSwapchainImagesKHR(icontext.swapchain);
+}
 
 int main()
 {
@@ -28,7 +39,7 @@ int main()
     }
     const ScopeExit cleanupGLFW(&glfwTerminate);
 
-    const vk::ApplicationInfo applicationInfo("Test", 0, "Test", 0);
+    const vk::ApplicationInfo applicationInfo("Test", 0, "Test", 0, VK_API_VERSION_1_2);
 
     uint32_t instanceExtensionCount;
     const auto listOfExtensions = glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
@@ -64,7 +75,7 @@ int main()
     const std::array queuePriorities{ 1.0f };
     const vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
 
-    const std::array extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const std::array extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME };
     const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
@@ -87,10 +98,7 @@ int main()
     }
     const ScopeExit cleanSurface([&]() { icontext.instance.destroySurfaceKHR(icontext.surface); });
 
-    const std::array queueFamiliesInSwapchain = { icontext.primaryFamilyIndex };
-    const vk::SwapchainCreateInfoKHR swapchainCreateInfo({}, icontext.surface, 3, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear, icontext.currentExtent, 
-            1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, queueFamiliesInSwapchain);
-    icontext.swapchain = icontext.device.createSwapchainKHR(swapchainCreateInfo);
+    recreateSwapchain(icontext);
     const ScopeExit cleanSwapchain([&]() { icontext.device.destroySwapchainKHR(icontext.swapchain); });
 
     while (!glfwWindowShouldClose(window))
