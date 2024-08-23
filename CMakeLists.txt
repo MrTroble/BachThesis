@@ -30,6 +30,6 @@ add_library(imgui_lib "submodules/imgui/imgui.cpp" "submodules/imgui/imgui_demo.
 target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
 
-add_executable(BachThesis "BachThesis.cpp" )
+add_executable(BachThesis "BachThesis.cpp"  )
 target_link_libraries(BachThesis PUBLIC imgui_lib)
 

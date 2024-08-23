@@ -1,25 +1,11 @@
-﻿#include "Util.h"
+﻿#include "Util.hpp"
+#include "Context.hpp"
+#include "CommandBuffer.hpp"
 
 #include <iostream>
-#include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 
 using namespace std;
-
-struct IContext {
-    vk::Instance instance;
-    // Device Creation
-    vk::Device device;
-    vk::PhysicalDevice physicalDevice;
-    std::vector<vk::QueueFamilyProperties> queueFamilyProperties;
-    uint32_t primaryFamilyIndex;
-    // Surface
-    vk::SurfaceKHR surface;
-    // Swapchain
-    vk::SwapchainKHR swapchain;
-    vk::Extent2D currentExtent;
-    std::vector<vk::Image> swapchainImages;
-};
 
 inline void recreateSwapchain(IContext& icontext) {
     if (icontext.swapchain)
@@ -29,6 +15,17 @@ inline void recreateSwapchain(IContext& icontext) {
         1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, queueFamiliesInSwapchain);
     icontext.swapchain = icontext.device.createSwapchainKHR(swapchainCreateInfo);
     icontext.swapchainImages = icontext.device.getSwapchainImagesKHR(icontext.swapchain);
+}
+
+inline void checkErrorOrRecreate(vk::Result result, IContext& context) {
+    if (result == vk::Result::eSuboptimalKHR) {
+        recreateSwapchain(context);
+        return;
+    }
+    if (result != vk::Result::eSuccess) {
+        std::cerr << "Vulkan Error with " << vk::to_string(result) << std::endl;
+        throw std::runtime_error("Vulkan Error!");
+    }
 }
 
 int main()
@@ -90,6 +87,7 @@ int main()
         std::cerr << "GLFW could not init!" << std::endl;
         return -1;
     }
+    const ScopeExit cleanWindow([&]() { glfwDestroyWindow(window); });
 
     const vk::Result result = (vk::Result)glfwCreateWindowSurface(icontext.instance, window, nullptr, (VkSurfaceKHR*)&icontext.surface);
     if (result != vk::Result::eSuccess) {
@@ -101,9 +99,24 @@ int main()
     recreateSwapchain(icontext);
     const ScopeExit cleanSwapchain([&]() { icontext.device.destroySwapchainKHR(icontext.swapchain); });
 
+    createPrimaryCommandBufferContext(icontext);
+    const ScopeExit cleanCommandPools([&]() { destroyPrimaryCommandBufferContext(icontext); });
+
+    const auto primaryQueue = icontext.device.getQueue(icontext.primaryFamilyIndex, 0);
+
+    const auto waitSemaphore = icontext.device.createSemaphore({});
+
     while (!glfwWindowShouldClose(window))
     {
+        const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), waitSemaphore);
+        checkErrorOrRecreate(nextImage.result, icontext);
+
         glfwPollEvents();
+
+        rerecordPrimary(icontext, nextImage.value);
+
+        const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
+        checkErrorOrRecreate(primaryQueue.presentKHR(presentInfo), icontext);
     }
     return 0;
 }
