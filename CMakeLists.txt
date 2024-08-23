@@ -30,6 +30,9 @@ add_library(imgui_lib "submodules/imgui/imgui.cpp" "submodules/imgui/imgui_demo.
 target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
 
-add_executable(BachThesis "BachThesis.cpp"  )
-target_link_libraries(BachThesis PUBLIC imgui_lib)
+message(${Vulkan_GLSLC_EXECUTABLE})
+add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 "shader/test.frag" -o "shader/test.spv"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 
+add_executable(BachThesis "BachThesis.cpp")
+target_link_libraries(BachThesis PUBLIC imgui_lib)
