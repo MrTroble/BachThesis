@@ -26,7 +26,10 @@ struct IContext {
     uint32_t amountOfImages = 3;
     vk::SwapchainKHR swapchain;
     vk::Extent2D currentExtent;
-    std::vector<vk::Image> swapchainImages;
+    std::vector<vk::ImageView> swapchainImages;
     // Command Buffer
     CommandBufferContext commandBuffer;
+    // Framebuffer/RenderPass
+    vk::RenderPass renderPass;
+    std::vector<vk::Framebuffer> frameBuffer;
 };

@@ -7,16 +7,6 @@
 
 using namespace std;
 
-inline void recreateSwapchain(IContext& icontext) {
-    if (icontext.swapchain)
-        icontext.device.destroySwapchainKHR(icontext.swapchain);
-    const std::array queueFamiliesInSwapchain = { icontext.primaryFamilyIndex };
-    const vk::SwapchainCreateInfoKHR swapchainCreateInfo({}, icontext.surface, 3, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear, icontext.currentExtent,
-        1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, queueFamiliesInSwapchain);
-    icontext.swapchain = icontext.device.createSwapchainKHR(swapchainCreateInfo);
-    icontext.swapchainImages = icontext.device.getSwapchainImagesKHR(icontext.swapchain);
-}
-
 inline void checkErrorOrRecreate(vk::Result result, IContext& context) {
     if (result == vk::Result::eSuboptimalKHR) {
         recreateSwapchain(context);
@@ -73,7 +63,12 @@ int main()
     const vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
 
     const std::array extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME };
-    const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions);
+    vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures;
+    meshShaderFeatures.meshShader = true;
+    meshShaderFeatures.taskShader = true;
+    vk::PhysicalDeviceFeatures2 features;
+    features.pNext = &meshShaderFeatures;
+    const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions, {}, &features);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
 
@@ -96,8 +91,11 @@ int main()
     }
     const ScopeExit cleanSurface([&]() { icontext.instance.destroySurfaceKHR(icontext.surface); });
 
+    renderPassCreation(icontext);
+    const ScopeExit cleanRenderPass([&]() { icontext.device.destroy(icontext.renderPass); });
+
     recreateSwapchain(icontext);
-    const ScopeExit cleanSwapchain([&]() { icontext.device.destroySwapchainKHR(icontext.swapchain); });
+    const ScopeExit cleanSwapchain([&]() { destroySwapchain(icontext); });
 
     createPrimaryCommandBufferContext(icontext);
     const ScopeExit cleanCommandPools([&]() { destroyPrimaryCommandBufferContext(icontext); });
@@ -105,15 +103,19 @@ int main()
     const auto primaryQueue = icontext.device.getQueue(icontext.primaryFamilyIndex, 0);
 
     const auto waitSemaphore = icontext.device.createSemaphore({});
+    const auto acquireSemaphore = icontext.device.createSemaphore({});
 
     while (!glfwWindowShouldClose(window))
     {
-        const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), waitSemaphore);
+        const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), acquireSemaphore);
         checkErrorOrRecreate(nextImage.result, icontext);
 
         glfwPollEvents();
 
         rerecordPrimary(icontext, nextImage.value);
+        const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
+        const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
+        primaryQueue.submit(submitInfo);
 
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
         checkErrorOrRecreate(primaryQueue.presentKHR(presentInfo), icontext);
