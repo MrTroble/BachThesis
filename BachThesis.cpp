@@ -4,6 +4,9 @@
 
 #include <iostream>
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
 
 using namespace std;
 
@@ -105,12 +108,56 @@ int main()
     const auto waitSemaphore = icontext.device.createSemaphore({});
     const auto acquireSemaphore = icontext.device.createSemaphore({});
 
+    vk::DescriptorPoolSize pool_sizes[] = {
+        { vk::DescriptorType::eSampler, 1000},
+        { vk::DescriptorType::eCombinedImageSampler, 1000},
+        { vk::DescriptorType::eSampledImage, 1000},
+        { vk::DescriptorType::eStorageImage, 1000},
+        { vk::DescriptorType::eUniformTexelBuffer, 1000},
+        { vk::DescriptorType::eStorageTexelBuffer, 1000},
+        { vk::DescriptorType::eUniformBuffer, 1000},
+        { vk::DescriptorType::eStorageBuffer, 1000},
+        { vk::DescriptorType::eUniformBufferDynamic, 1000},
+        { vk::DescriptorType::eStorageBufferDynamic, 1000},
+        { vk::DescriptorType::eInputAttachment, 1000} };
+    vk::DescriptorPoolCreateInfo pool_info = {};
+    pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
+    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes = pool_sizes;
+    const auto imguiPool = icontext.device.createDescriptorPool(pool_info);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+    ImGui_ImplVulkan_InitInfo vulkanImguiInfo{};
+    vulkanImguiInfo.Device = icontext.device;
+    vulkanImguiInfo.ImageCount = icontext.amountOfImages;
+    vulkanImguiInfo.MinImageCount = icontext.amountOfImages;
+    vulkanImguiInfo.Instance = icontext.instance;
+    vulkanImguiInfo.PhysicalDevice = icontext.physicalDevice;
+    vulkanImguiInfo.Queue = primaryQueue;
+    vulkanImguiInfo.QueueFamily = icontext.primaryFamilyIndex;
+    vulkanImguiInfo.RenderPass = icontext.renderPass;
+    vulkanImguiInfo.Subpass = 0;
+    vulkanImguiInfo.DescriptorPool = imguiPool;
+    vulkanImguiInfo.Allocator = nullptr;
+    vulkanImguiInfo.MSAASamples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+    ImGui_ImplVulkan_Init(&vulkanImguiInfo);
+
     while (!glfwWindowShouldClose(window))
     {
         const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), acquireSemaphore);
         checkErrorOrRecreate(nextImage.result, icontext);
 
         glfwPollEvents();
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+        ImGui::Render();
 
         rerecordPrimary(icontext, nextImage.value);
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
@@ -120,5 +167,8 @@ int main()
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
         checkErrorOrRecreate(primaryQueue.presentKHR(presentInfo), icontext);
     }
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     return 0;
 }

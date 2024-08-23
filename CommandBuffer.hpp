@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Context.hpp"
+#include "backends/imgui_impl_vulkan.h"
 
 inline void createPrimaryCommandBufferContext(IContext& context) {
     const vk::CommandPoolCreateInfo defaultPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -22,13 +23,13 @@ inline void destroyPrimaryCommandBufferContext(IContext& context) {
 
 inline void rerecordPrimary(IContext& context, uint32_t currentImage) {
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
-    const vk::CommandBufferBeginInfo beginInfo;
+    const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
     const vk::ClearValue clearColor(vk::ClearColorValue{ 0.0f, 0.0f, 0.0f, 0.0f });
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage], 
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
-    currentBuffer.draw(3, 0, 0, 0);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), currentBuffer);
     currentBuffer.endRenderPass();
     currentBuffer.end();
 }
