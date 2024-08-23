@@ -3,7 +3,6 @@
 #include "CommandBuffer.hpp"
 
 #include <iostream>
-#include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
@@ -11,7 +10,9 @@
 using namespace std;
 
 inline void checkErrorOrRecreate(vk::Result result, IContext& context) {
-    if (result == vk::Result::eSuboptimalKHR) {
+    if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
+        const auto capabilities = context.physicalDevice.getSurfaceCapabilitiesKHR(context.surface);
+        context.currentExtent = capabilities.currentExtent;
         recreateSwapchain(context);
         return;
     }
@@ -75,24 +76,23 @@ int main()
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
 
-    icontext.currentExtent = vk::Extent2D{ 640u, 480u };
-
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(icontext.currentExtent.width, icontext.currentExtent.height,
-        applicationInfo.pApplicationName, NULL, NULL);
-    if (!window)
+    icontext.window = glfwCreateWindow(640u, 480u, applicationInfo.pApplicationName, NULL, NULL);
+    if (!icontext.window)
     {
         std::cerr << "GLFW could not init!" << std::endl;
         return -1;
     }
-    const ScopeExit cleanWindow([&]() { glfwDestroyWindow(window); });
+    const ScopeExit cleanWindow([&]() { glfwDestroyWindow(icontext.window); });
 
-    const vk::Result result = (vk::Result)glfwCreateWindowSurface(icontext.instance, window, nullptr, (VkSurfaceKHR*)&icontext.surface);
+    const vk::Result result = (vk::Result)glfwCreateWindowSurface(icontext.instance, icontext.window, nullptr, (VkSurfaceKHR*)&icontext.surface);
     if (result != vk::Result::eSuccess) {
         std::cerr << "GLFW Surface creation failed! With VkResult " << vk::to_string(result) << std::endl;
         return -1;
     }
     const ScopeExit cleanSurface([&]() { icontext.instance.destroySurfaceKHR(icontext.surface); });
+    const auto capabilities = icontext.physicalDevice.getSurfaceCapabilitiesKHR(icontext.surface);
+    icontext.currentExtent = capabilities.currentExtent;
 
     renderPassCreation(icontext);
     const ScopeExit cleanRenderPass([&]() { icontext.device.destroy(icontext.renderPass); });
@@ -107,6 +107,10 @@ int main()
 
     const auto waitSemaphore = icontext.device.createSemaphore({});
     const auto acquireSemaphore = icontext.device.createSemaphore({});
+    const ScopeExit cleanupSemaphore([&]() {
+        icontext.device.destroy(waitSemaphore);
+        icontext.device.destroy(acquireSemaphore);
+        });
 
     vk::DescriptorPoolSize pool_sizes[] = {
         { vk::DescriptorType::eSampler, 1000},
@@ -121,17 +125,19 @@ int main()
         { vk::DescriptorType::eStorageBufferDynamic, 1000},
         { vk::DescriptorType::eInputAttachment, 1000} };
     vk::DescriptorPoolCreateInfo pool_info = {};
+    pool_info.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
     pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
     pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
     pool_info.pPoolSizes = pool_sizes;
     const auto imguiPool = icontext.device.createDescriptorPool(pool_info);
+    const ScopeExit cleanupPool([&]() { icontext.device.destroy(imguiPool); });
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-    ImGui_ImplGlfw_InitForVulkan(window, true);
+    ImGui_ImplGlfw_InitForVulkan(icontext.window, true);
     ImGui_ImplVulkan_InitInfo vulkanImguiInfo{};
     vulkanImguiInfo.Device = icontext.device;
     vulkanImguiInfo.ImageCount = icontext.amountOfImages;
@@ -147,26 +153,44 @@ int main()
     vulkanImguiInfo.MSAASamples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
     ImGui_ImplVulkan_Init(&vulkanImguiInfo);
 
-    while (!glfwWindowShouldClose(window))
+    std::vector<vk::Fence> fencesToCheck(icontext.amountOfImages);
+    for (auto& fence : fencesToCheck)
     {
+        fence = icontext.device.createFence({ vk::FenceCreateFlagBits::eSignaled });
+    }
+    const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
+
+    while (!glfwWindowShouldClose(icontext.window))
+    {
+        glfwPollEvents();
+        int x, y;
+        glfwGetWindowSize(icontext.window, (int*)&x, (int*)&y);
+        if (icontext.currentExtent.width != x || icontext.currentExtent.height != y) {
+            recreateSwapchain(icontext);
+        }
+
         const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), acquireSemaphore);
         checkErrorOrRecreate(nextImage.result, icontext);
 
-        glfwPollEvents();
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGui::ShowDemoWindow();
         ImGui::Render();
 
+        checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
+        icontext.device.resetFences(fencesToCheck[nextImage.value]);
+
         rerecordPrimary(icontext, nextImage.value);
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
-        primaryQueue.submit(submitInfo);
+        primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
 
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
-        checkErrorOrRecreate(primaryQueue.presentKHR(presentInfo), icontext);
+        checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
     }
+    checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck, true, std::numeric_limits<uint64_t>().max()), icontext);
+
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

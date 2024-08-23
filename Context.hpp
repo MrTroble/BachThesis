@@ -1,5 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
+#include <GLFW/glfw3.h>
 
 enum class DataCommandBuffer {
     DataUpload,
@@ -14,6 +15,7 @@ struct CommandBufferContext {
 };
 
 struct IContext {
+    GLFWwindow* window;
     vk::Instance instance;
     // Device Creation
     vk::Device device;
