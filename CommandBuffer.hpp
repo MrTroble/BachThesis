@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include "Context.hpp"
 #include "backends/imgui_impl_vulkan.h"
 
@@ -26,7 +27,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage) {
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
     const vk::ClearValue clearColor(vk::ClearColorValue{ 0.0f, 0.0f, 0.0f, 0.0f });
-    const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage], 
+    const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), currentBuffer);
@@ -85,4 +86,24 @@ inline void renderPassCreation(IContext& icontext) {
 
     const vk::RenderPassCreateInfo  renderPassCreateInfo({}, attachements, subpassDescription);
     icontext.renderPass = icontext.device.createRenderPass(renderPassCreateInfo);
+}
+
+inline void loadAndAdd(IContext& context) {
+    for (const auto& name : { "test.frag.spv", "testMesh.spv" }) {
+        const auto fileName = (std::filesystem::path("shader") / name).string();
+        const auto loadValues = readFullFile(fileName);
+        vk::ShaderModuleCreateInfo shaderModuleCreateInfo({}, loadValues.size(), (uint32_t*)loadValues.data());
+        const auto shaderModule = context.device.createShaderModule(shaderModuleCreateInfo);
+        context.shaderModule[name] = shaderModule;
+    }
+}
+
+inline void createShaderPipelines(IContext& context) {
+    loadAndAdd(context);
+}
+
+inline void destroyShaderPipelines(IContext& context) {
+    for (const auto& [name, shader] : context.shaderModule) {
+        context.device.destroy(shader);
+    }
 }

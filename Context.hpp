@@ -1,4 +1,8 @@
 #pragma once
+#include <unordered_map>
+#include <vector>
+#include <string>
+
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 
@@ -34,4 +38,6 @@ struct IContext {
     // Framebuffer/RenderPass
     vk::RenderPass renderPass;
     std::vector<vk::Framebuffer> frameBuffer;
+    // Shader/Pipes
+    std::unordered_map<std::string, vk::ShaderModule> shaderModule;
 };

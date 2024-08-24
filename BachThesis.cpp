@@ -103,6 +103,9 @@ int main()
     createPrimaryCommandBufferContext(icontext);
     const ScopeExit cleanCommandPools([&]() { destroyPrimaryCommandBufferContext(icontext); });
 
+    createShaderPipelines(icontext);
+    const ScopeExit cleanShaderPipes([&]() { destroyShaderPipelines(icontext); });
+
     const auto primaryQueue = icontext.device.getQueue(icontext.primaryFamilyIndex, 0);
 
     const auto waitSemaphore = icontext.device.createSemaphore({});
