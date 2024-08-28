@@ -16,10 +16,16 @@ struct CommandBufferContext {
     vk::CommandPool uploadAndDataPool;
     std::vector<vk::CommandBuffer> primaryBuffers;
     std::array<vk::CommandBuffer, (size_t)DataCommandBuffer::Last + 1> dataCommandBuffer;
+    std::array<vk::Fence, (size_t)DataCommandBuffer::Last + 1> dataCommandFences;
+
+    template<DataCommandBuffer buffer>
+    inline std::pair<vk::CommandBuffer, vk::Fence> get() {
+        return std::make_pair(dataCommandBuffer[(size_t)buffer], dataCommandFences[(size_t)buffer]);
+    }
 };
 
 struct AllocationInfo {
-    
+
 };
 
 struct IContext {
@@ -45,21 +51,6 @@ struct IContext {
     // Shader/Pipes
     std::unordered_map<std::string, vk::ShaderModule> shaderModule;
     // Memory
-     
-    inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
-        const auto properties = physicalDevice.getMemoryProperties();
-        uint32_t memoryTypeIndex = UINT32_MAX;
-        for (uint32_t i = 0; i < properties.memoryTypeCount; i++)
-        {
-            const auto& type = properties.memoryTypes[i];
-            if (type.propertyFlags | flags) {
-                memoryTypeIndex = i;
-                break;
-            }
-        }
-        vk::MemoryAllocateInfo memoryAllocationInfo(memorySize, memoryTypeIndex);
-        return device.allocateMemory(memoryAllocationInfo);
-    }
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();
@@ -67,7 +58,7 @@ struct IContext {
         for (uint32_t i = 0; i < properties.memoryTypeCount; i++)
         {
             const auto& type = properties.memoryTypes[i];
-            if (type.propertyFlags | flags) {
+            if (type.propertyFlags & flags) {
                 memoryTypeIndex = i;
                 break;
             }

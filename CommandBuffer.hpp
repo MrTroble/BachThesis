@@ -15,11 +15,20 @@ inline void createPrimaryCommandBufferContext(IContext& context) {
     allocateInfo.commandBufferCount = context.commandBuffer.dataCommandBuffer.size();
     const auto dataBuffers = context.device.allocateCommandBuffers(allocateInfo);
     std::copy(dataBuffers.begin(), dataBuffers.end(), context.commandBuffer.dataCommandBuffer.begin());
+
+    for (auto& fence : context.commandBuffer.dataCommandFences)
+    {
+        fence = context.device.createFence({});
+    }
 }
 
 inline void destroyPrimaryCommandBufferContext(IContext& context) {
     context.device.destroy(context.commandBuffer.primaryPool);
     context.device.destroy(context.commandBuffer.uploadAndDataPool);
+    for (const auto fence : context.commandBuffer.dataCommandFences)
+    {
+        context.device.destroy(fence);
+    }
 }
 
 inline void rerecordPrimary(IContext& context, uint32_t currentImage) {

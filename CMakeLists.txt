@@ -35,6 +35,7 @@ add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulka
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
 configure_file("shader/test.frag.spv" "shader/test.frag.spv" COPYONLY)
 configure_file("shader/testMesh.spv" "shader/testMesh.spv" COPYONLY)
+configure_file("assets/crystal.vtk" "assets/crystal.vtk" COPYONLY)
 
 add_executable(BachThesis "BachThesis.cpp")
 target_link_libraries(BachThesis PUBLIC imgui_lib)
