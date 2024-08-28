@@ -2,13 +2,13 @@
 
 #extension GL_EXT_mesh_shader : require
 
-layout (local_size_x=128, local_size_y=128, local_size_z=128) in; // Typical limit: 128 invocations.
+layout (local_size_x=128, local_size_y=1, local_size_z=1) in;
 
-layout (triangles) out; // May also be points or lines.
-layout (max_vertices=256, max_primitives=256) out; // Typical limit: 256 vert/prim.
-layout (location=0) out vec4 out0[]; // Per-vertex.
+layout (triangles) out;
+layout (max_vertices=5, max_primitives=4) out;
+layout (location=0) out vec4 out0[];
 layout (location=1) perprimitiveEXT out vec4 out1[];
 
 void main() {
-
+    
 }

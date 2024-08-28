@@ -18,6 +18,10 @@ struct CommandBufferContext {
     std::array<vk::CommandBuffer, (size_t)DataCommandBuffer::Last + 1> dataCommandBuffer;
 };
 
+struct AllocationInfo {
+    
+};
+
 struct IContext {
     GLFWwindow* window;
     vk::Instance instance;
@@ -40,4 +44,36 @@ struct IContext {
     std::vector<vk::Framebuffer> frameBuffer;
     // Shader/Pipes
     std::unordered_map<std::string, vk::ShaderModule> shaderModule;
+    // Memory
+     
+    inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
+        const auto properties = physicalDevice.getMemoryProperties();
+        uint32_t memoryTypeIndex = UINT32_MAX;
+        for (uint32_t i = 0; i < properties.memoryTypeCount; i++)
+        {
+            const auto& type = properties.memoryTypes[i];
+            if (type.propertyFlags | flags) {
+                memoryTypeIndex = i;
+                break;
+            }
+        }
+        vk::MemoryAllocateInfo memoryAllocationInfo(memorySize, memoryTypeIndex);
+        return device.allocateMemory(memoryAllocationInfo);
+    }
+
+    inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
+        const auto properties = physicalDevice.getMemoryProperties();
+        uint32_t memoryTypeIndex = UINT32_MAX;
+        for (uint32_t i = 0; i < properties.memoryTypeCount; i++)
+        {
+            const auto& type = properties.memoryTypes[i];
+            if (type.propertyFlags | flags) {
+                memoryTypeIndex = i;
+                break;
+            }
+        }
+        vk::MemoryAllocateInfo memoryAllocationInfo(memorySize, memoryTypeIndex);
+        return device.allocateMemory(memoryAllocationInfo);
+    }
+
 };
