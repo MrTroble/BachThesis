@@ -30,6 +30,7 @@ struct AllocationInfo {
 
 struct IContext {
     GLFWwindow* window;
+    vk::DispatchLoaderDynamic dynamicLoader;
     vk::Instance instance;
     // Device Creation
     vk::Device device;
@@ -50,6 +51,9 @@ struct IContext {
     std::vector<vk::Framebuffer> frameBuffer;
     // Shader/Pipes
     std::unordered_map<std::string, vk::ShaderModule> shaderModule;
+    vk::DescriptorSetLayout defaultDescriptorSetLayout;
+    vk::PipelineLayout defaultPipelineLayout;
+    vk::Pipeline wireframePipeline;
     // Memory
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {

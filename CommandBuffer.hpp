@@ -3,6 +3,7 @@
 #include <filesystem>
 #include "Context.hpp"
 #include "backends/imgui_impl_vulkan.h"
+#include "LoadVTK.hpp"
 
 inline void createPrimaryCommandBufferContext(IContext& context) {
     const vk::CommandPoolCreateInfo defaultPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -31,7 +32,7 @@ inline void destroyPrimaryCommandBufferContext(IContext& context) {
     }
 }
 
-inline void rerecordPrimary(IContext& context, uint32_t currentImage) {
+inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std::vector<VTKFile>& vtkFiles) {
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
@@ -39,6 +40,17 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage) {
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
+
+    for (const auto& vtk : vtkFiles)
+    {
+        const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
+        for (size_t i = 0; i < workGroups; i++)
+        {
+            //currentBuffer.pushConstants()
+            //currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
+        }
+    }
+
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), currentBuffer);
     currentBuffer.endRenderPass();
     currentBuffer.end();
@@ -109,10 +121,49 @@ inline void loadAndAdd(IContext& context) {
 
 inline void createShaderPipelines(IContext& context) {
     loadAndAdd(context);
+
+    std::array pipelineShaderStages = {
+        vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
+        vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.spv"], "main"}
+    };
+    vk::Rect2D rect2d{ {0,0}, context.currentExtent };
+    vk::Viewport viewport(0, 0, (float)context.currentExtent.width, (float)context.currentExtent.height, 0.0f, 1.0f);
+    vk::PipelineViewportStateCreateInfo viewportState({}, viewport, rect2d);
+    vk::PipelineRasterizationStateCreateInfo rasterizationState({}, false, false, vk::PolygonMode::eLine,
+        vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f, 1.0f);
+    vk::PipelineMultisampleStateCreateInfo multiplesampleState({}, vk::SampleCountFlagBits::e1);
+    vk::PipelineDepthStencilStateCreateInfo depthState({}, false, false, vk::CompareOp::eNever, false, false);
+    std::array colorBlends = { vk::PipelineColorBlendAttachmentState() };
+    vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eClear, colorBlends);
+
+    std::array bindings = { vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
+            1, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eMeshEXT) };
+    vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
+    context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
+
+    std::array descriptorSets = { context.defaultDescriptorSetLayout };
+    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(size_t)} };
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConstantRanges);
+    const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
+    context.defaultPipelineLayout = pipelineLayout;
+
+    vk::GraphicsPipelineCreateInfo createWirelessCreateInfo({}, pipelineShaderStages);
+    createWirelessCreateInfo.layout = pipelineLayout;
+    createWirelessCreateInfo.pMultisampleState = &multiplesampleState;
+    createWirelessCreateInfo.pDepthStencilState = &depthState;
+    createWirelessCreateInfo.pColorBlendState = &colorBlend;
+    createWirelessCreateInfo.pRasterizationState = &rasterizationState;
+    createWirelessCreateInfo.pViewportState = &viewportState;
+    createWirelessCreateInfo.renderPass = context.renderPass;
+    const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+    context.wireframePipeline = result.value;
 }
 
 inline void destroyShaderPipelines(IContext& context) {
     for (const auto& [name, shader] : context.shaderModule) {
         context.device.destroy(shader);
     }
+    context.device.destroy(context.defaultDescriptorSetLayout);
+    context.device.destroy(context.defaultPipelineLayout);
+    context.device.destroy(context.wireframePipeline);
 }

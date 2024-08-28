@@ -73,9 +73,12 @@ int main()
     meshShaderFeatures.taskShader = true;
     vk::PhysicalDeviceFeatures2 features;
     features.pNext = &meshShaderFeatures;
+    features.features.fillModeNonSolid = true;
     const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions, {}, &features);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
+    icontext.dynamicLoader.vkCmdDrawMeshTasksEXT = 
+        (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(icontext.device, "vkCmdDrawMeshTasksEXT");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     icontext.window = glfwCreateWindow(640u, 480u, applicationInfo.pApplicationName, NULL, NULL);
@@ -164,8 +167,8 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    auto crystal = loadVTK("assets/crystal.vtk", icontext);
-    const ScopeExit cleanCrystal([&]() { crystal.unload(icontext); });
+    std::vector vtkFiles = { loadVTK("assets/crystal.vtk", icontext) };
+    const ScopeExit cleanCrystal([&]() { for(auto &file : vtkFiles) file.unload(icontext); });
 
     while (!glfwWindowShouldClose(icontext.window))
     {
@@ -188,7 +191,7 @@ int main()
         checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
         icontext.device.resetFences(fencesToCheck[nextImage.value]);
 
-        rerecordPrimary(icontext, nextImage.value);
+        rerecordPrimary(icontext, nextImage.value, vtkFiles);
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
         primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);

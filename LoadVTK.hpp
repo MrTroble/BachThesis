@@ -15,13 +15,8 @@ struct Tetrahedron {
 };
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 
-struct WorkGroup {
-    size_t offset;
-    size_t groupSize = MAX_WORK_GROUPS;
-};
-
 struct VTKFile {
-    std::vector<WorkGroup> workGroups;
+    size_t amountOfTetrahedrons;
     vk::DeviceMemory memory;
     vk::Buffer vertexBuffer;
     vk::Buffer indexBuffer;
@@ -104,16 +99,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     auto queue = context.device.getQueue(context.primaryFamilyIndex, 0);
     const vk::SubmitInfo submitInfo({}, {}, commandBuffer);
     queue.submit(submitInfo, fence);
-
-    VTKFile file{{}, actualeMemory, localVertexBuffer, localIndexBuffer };
-    size_t i = 0;
-    for (; i < tetrahedrons.size(); i++)
-    {
-        if (i == MAX_WORK_GROUPS) {
-
-        }
-    }
-
+    
+    VTKFile file{tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer};
     context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     return file;
 }
