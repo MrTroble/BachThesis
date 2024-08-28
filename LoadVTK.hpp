@@ -25,6 +25,12 @@ struct VTKFile {
     vk::DeviceMemory memory;
     vk::Buffer vertexBuffer;
     vk::Buffer indexBuffer;
+
+    void unload(IContext& context) {
+        context.device.freeMemory(memory);
+        context.device.destroy(vertexBuffer);
+        context.device.destroy(indexBuffer);
+    }
 };
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {

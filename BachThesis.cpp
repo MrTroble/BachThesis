@@ -164,7 +164,8 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    const auto crystal = loadVTK("assets/crystal.vtk", icontext);
+    auto crystal = loadVTK("assets/crystal.vtk", icontext);
+    const ScopeExit cleanCrystal([&]() { crystal.unload(icontext); });
 
     while (!glfwWindowShouldClose(icontext.window))
     {
