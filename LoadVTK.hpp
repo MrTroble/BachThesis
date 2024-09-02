@@ -2,13 +2,10 @@
 
 #include <vector>
 #include <string>
+#include <glm/glm.hpp>
 #include "Context.hpp"
 
 constexpr uint32_t MAX_WORK_GROUPS = 128;
-
-struct Vertex {
-    float x, y, z;
-};
 
 struct Tetrahedron {
     uint32_t p1, p2, p3, p4;
@@ -33,15 +30,16 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
     std::string value;
 
-    std::vector<Vertex> vertices;
+    std::vector<glm::vec4> vertices;
     std::vector<Tetrahedron> tetrahedrons;
 
     while (valueVTK)
     {
         valueVTK >> value;
         if (value == "v") {
-            Vertex vertex;
+            glm::vec4 vertex;
             valueVTK >> vertex.x >> vertex.y >> vertex.z;
+            vertex.w = 1.0f;
             vertices.push_back(vertex);
         }
         else if (value == "t") {
@@ -55,7 +53,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         }
     }
     const auto tetrahedronByteSize = tetrahedrons.size() * sizeof(Tetrahedron);
-    const auto vertexByteSize = vertices.size() * sizeof(Vertex);
+    const auto vertexByteSize = vertices.size() * sizeof(glm::vec4);
     const vk::BufferCreateInfo stagingBufferCreateInfo({},
         vertexByteSize + tetrahedronByteSize, vk::BufferUsageFlagBits::eTransferSrc,
         vk::SharingMode::eExclusive, context.primaryFamilyIndex);
@@ -68,7 +66,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const ScopeExit cleanStagingMemory([&]() { context.device.freeMemory(stagingMemory); });
 
     void* mapped = context.device.mapMemory(stagingMemory, 0, VK_WHOLE_SIZE);
-    std::copy(vertices.begin(), vertices.end(), (Vertex*)mapped);
+    std::copy(vertices.begin(), vertices.end(), (glm::vec4*)mapped);
     std::copy(tetrahedrons.begin(), tetrahedrons.end(), (Tetrahedron*)((char*)mapped + vertexByteSize));
     context.device.unmapMemory(stagingMemory);
     context.device.bindBufferMemory(stagingBuffer, stagingMemory, 0);
@@ -94,7 +92,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     commandBuffer.begin(beginInfo);
     const vk::BufferCopy copyBuffer(0, 0, vertexByteSize);
     commandBuffer.copyBuffer(stagingBuffer, localVertexBuffer, copyBuffer);
-    const vk::BufferCopy copyBufferIndex(alignedSize, 0, tetrahedronByteSize);
+    const vk::BufferCopy copyBufferIndex(vertexByteSize, 0, tetrahedronByteSize);
     commandBuffer.copyBuffer(stagingBuffer, localIndexBuffer, copyBufferIndex);
     commandBuffer.end();
     auto queue = context.device.getQueue(context.primaryFamilyIndex, 0);

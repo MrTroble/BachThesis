@@ -173,6 +173,9 @@ int main()
     while (!glfwWindowShouldClose(icontext.window))
     {
         glfwPollEvents();
+        if (glfwGetWindowAttrib(icontext.window, GLFW_ICONIFIED)) {
+            continue;
+        }
         int x, y;
         glfwGetWindowSize(icontext.window, (int*)&x, (int*)&y);
         if (icontext.currentExtent.width != x || icontext.currentExtent.height != y) {

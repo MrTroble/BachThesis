@@ -44,10 +44,19 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     for (const auto& vtk : vtkFiles)
     {
         const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
+        const size_t lastGroupAmount = vtk.amountOfTetrahedrons - workGroups;
+        currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context.wireframePipeline);
+        currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context.defaultPipelineLayout, 0, vtk.descriptor, {});
         for (size_t i = 0; i < workGroups; i++)
         {
-            //currentBuffer.pushConstants()
+            const uint32_t currentOffset = i * MAX_WORK_GROUPS;
+            currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
             currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
+        }
+        if (lastGroupAmount > 0) {
+            const uint32_t currentOffset = workGroups * MAX_WORK_GROUPS;
+            currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
+            currentBuffer.drawMeshTasksEXT(lastGroupAmount, 1, 1, context.dynamicLoader);
         }
     }
 
@@ -145,7 +154,7 @@ inline void createShaderPipelines(IContext& context) {
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
-    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, 2*sizeof(uint32_t)} };
+    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, 2 * sizeof(uint32_t)} };
     vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConstantRanges);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
