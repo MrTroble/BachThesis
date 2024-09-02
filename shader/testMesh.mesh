@@ -11,7 +11,7 @@ layout (binding=0) buffer Index {
     uvec4 data[];
 } index;
 layout (binding=1) buffer Vertex {
-    vec4 data[];
+    vec4 vertexData[];
 } vertex;
 
 layout(push_constant) uniform PushConsts {
@@ -29,7 +29,7 @@ void main() {
     gl_PrimitiveLineIndicesEXT[5] = uvec2(2, 3);
 
     for(uint x = 0; x < 4; x++) {
-        gl_MeshVerticesEXT[x].gl_Position = vertex.data[tetrahedron[x]];
+        gl_MeshVerticesEXT[x].gl_Position = vertex.vertexData[tetrahedron[x]];
     }
     SetMeshOutputsEXT(4, 6);
 }

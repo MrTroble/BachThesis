@@ -84,7 +84,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const auto actualeMemory = context.requestMemory(sizeOfMemory,
         vk::MemoryPropertyFlagBits::eDeviceLocal);
     context.device.bindBufferMemory(localVertexBuffer, actualeMemory, 0);
-    const auto alignedSize = (localVertexMemory.size + localVertexMemory.alignment) % localVertexMemory.alignment;
+    const auto alignedSize = ((localVertexMemory.size + localVertexMemory.alignment) / localVertexMemory.alignment) * localVertexMemory.alignment;
     context.device.bindBufferMemory(localIndexBuffer, actualeMemory, alignedSize);
 
     auto [commandBuffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
@@ -102,7 +102,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, context.defaultDescriptorSetLayout);
     const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
     vk::DescriptorBufferInfo descriptorIndexInfo(localIndexBuffer, 0, VK_WHOLE_SIZE);
-    vk::DescriptorBufferInfo descriptorVertexInfo(localVertexBuffer, 0, VK_WHOLE_SIZE);
+    vk::DescriptorBufferInfo descriptorVertexInfo(localVertexBuffer, 0, vertexByteSize);
     vk::WriteDescriptorSet writeIndexDescriptorSets(descriptor[0], 0, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorIndexInfo);
     vk::WriteDescriptorSet writeVertexDescriptorSets(descriptor[0], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorVertexInfo);
     std::array writeUpdateInfos = { writeIndexDescriptorSets,  writeVertexDescriptorSets };
