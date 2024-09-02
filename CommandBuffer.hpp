@@ -47,7 +47,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         for (size_t i = 0; i < workGroups; i++)
         {
             //currentBuffer.pushConstants()
-            //currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
+            currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
         }
     }
 
@@ -136,13 +136,16 @@ inline void createShaderPipelines(IContext& context) {
     std::array colorBlends = { vk::PipelineColorBlendAttachmentState() };
     vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eClear, colorBlends);
 
-    std::array bindings = { vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
-            1, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eMeshEXT) };
+    std::array bindings = {
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
+                    1, vk::ShaderStageFlagBits::eMeshEXT),
+        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
+                    1, vk::ShaderStageFlagBits::eMeshEXT) };
     vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
-    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(size_t)} };
+    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, 2*sizeof(uint32_t)} };
     vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConstantRanges);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
@@ -157,12 +160,17 @@ inline void createShaderPipelines(IContext& context) {
     createWirelessCreateInfo.renderPass = context.renderPass;
     const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
     context.wireframePipeline = result.value;
+
+    const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 1);
+    const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1, poolSize);
+    context.descriptorPool = context.device.createDescriptorPool(descriptorPoolCreateInfo);
 }
 
 inline void destroyShaderPipelines(IContext& context) {
     for (const auto& [name, shader] : context.shaderModule) {
         context.device.destroy(shader);
     }
+    context.device.destroy(context.descriptorPool);
     context.device.destroy(context.defaultDescriptorSetLayout);
     context.device.destroy(context.defaultPipelineLayout);
     context.device.destroy(context.wireframePipeline);

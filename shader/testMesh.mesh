@@ -4,11 +4,35 @@
 
 layout (local_size_x=128, local_size_y=1, local_size_z=1) in;
 
-layout (triangles) out;
-layout (max_vertices=5, max_primitives=4) out;
-layout (location=0) out vec4 out0[];
-layout (location=1) perprimitiveEXT out vec4 out1[];
+layout (lines) out;
+layout (max_vertices=4, max_primitives=6) out;
+
+struct Tetrahedron {
+    uint p1, p2, p3, p4;
+};
+
+layout (binding=0) buffer Index {
+    Tetrahedron data[];
+} index;
+layout (binding=1) buffer Vertex {
+    vec3 data[];
+} vertex;
+
+layout(push_constant) uniform PushConsts {
+    uint offset;
+} push;
 
 void main() {
-    
+    const uint i = gl_LocalInvocationIndex.x;
+    const Tetrahedron tetrahedron = index.data[i + push.offset];
+    gl_PrimitiveLineIndicesEXT[0] = uvec2(0, 1);
+    gl_PrimitiveLineIndicesEXT[1] = uvec2(0, 2);
+    gl_PrimitiveLineIndicesEXT[2] = uvec2(0, 3);
+    gl_PrimitiveLineIndicesEXT[3] = uvec2(1, 2);
+    gl_PrimitiveLineIndicesEXT[4] = uvec2(1, 3);
+    gl_PrimitiveLineIndicesEXT[5] = uvec2(2, 3);
+
+    for(uint x = 0; x < 4; x++) {
+        gl_MeshVerticesEXT[x].gl_Position = vec4(vertex.data[x], 1.0f);
+    }
 }

@@ -54,6 +54,7 @@ struct IContext {
     vk::DescriptorSetLayout defaultDescriptorSetLayout;
     vk::PipelineLayout defaultPipelineLayout;
     vk::Pipeline wireframePipeline;
+    vk::DescriptorPool descriptorPool;
     // Memory
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {

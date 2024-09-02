@@ -20,6 +20,7 @@ struct VTKFile {
     vk::DeviceMemory memory;
     vk::Buffer vertexBuffer;
     vk::Buffer indexBuffer;
+    vk::DescriptorSet descriptor;
 
     void unload(IContext& context) {
         context.device.freeMemory(memory);
@@ -99,8 +100,17 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     auto queue = context.device.getQueue(context.primaryFamilyIndex, 0);
     const vk::SubmitInfo submitInfo({}, {}, commandBuffer);
     queue.submit(submitInfo, fence);
-    
-    VTKFile file{tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer};
+
+    const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, context.defaultDescriptorSetLayout);
+    const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
+    vk::DescriptorBufferInfo descriptorIndexInfo(localIndexBuffer, 0, VK_WHOLE_SIZE);
+    vk::DescriptorBufferInfo descriptorVertexInfo(localVertexBuffer, 0, VK_WHOLE_SIZE);
+    vk::WriteDescriptorSet writeIndexDescriptorSets(descriptor[0], 0, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorIndexInfo);
+    vk::WriteDescriptorSet writeVertexDescriptorSets(descriptor[0], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorVertexInfo);
+    std::array writeUpdateInfos = { writeIndexDescriptorSets,  writeVertexDescriptorSets };
+    context.device.updateDescriptorSets(writeUpdateInfos, {});
+
+    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, descriptor[0]};
     context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     return file;
 }
