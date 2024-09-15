@@ -56,6 +56,12 @@ struct IContext {
     vk::Pipeline wireframePipeline;
     vk::DescriptorPool descriptorPool;
     // Memory
+    vk::DeviceMemory cameraStagingMemory;
+    vk::DeviceMemory cameraMemory;
+    vk::Buffer stagingCamera;
+    vk::Buffer uniformCamera;
+    // Queue
+    vk::Queue primaryQueue;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();

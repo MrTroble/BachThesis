@@ -110,7 +110,10 @@ int main()
     createShaderPipelines(icontext);
     const ScopeExit cleanShaderPipes([&]() { destroyShaderPipelines(icontext); });
 
-    const auto primaryQueue = icontext.device.getQueue(icontext.primaryFamilyIndex, 0);
+    icontext.primaryQueue = icontext.device.getQueue(icontext.primaryFamilyIndex, 0);
+
+    createBuffer(icontext);
+    const ScopeExit cleanBuffers([&]() { destroyBuffer(icontext); });
 
     const auto waitSemaphore = icontext.device.createSemaphore({});
     const auto acquireSemaphore = icontext.device.createSemaphore({});
@@ -151,7 +154,7 @@ int main()
     vulkanImguiInfo.MinImageCount = icontext.amountOfImages;
     vulkanImguiInfo.Instance = icontext.instance;
     vulkanImguiInfo.PhysicalDevice = icontext.physicalDevice;
-    vulkanImguiInfo.Queue = primaryQueue;
+    vulkanImguiInfo.Queue = icontext.primaryQueue;
     vulkanImguiInfo.QueueFamily = icontext.primaryFamilyIndex;
     vulkanImguiInfo.RenderPass = icontext.renderPass;
     vulkanImguiInfo.Subpass = 0;
@@ -197,10 +200,10 @@ int main()
         rerecordPrimary(icontext, nextImage.value, vtkFiles);
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
-        primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
+        icontext.primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
 
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
-        checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
+        checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
     }
     checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck, true, std::numeric_limits<uint64_t>().max()), icontext);
 

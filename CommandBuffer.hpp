@@ -4,6 +4,7 @@
 #include "Context.hpp"
 #include "backends/imgui_impl_vulkan.h"
 #include "LoadVTK.hpp"
+#include <glm/ext.hpp>
 
 inline void createPrimaryCommandBufferContext(IContext& context) {
     const vk::CommandPoolCreateInfo defaultPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -146,9 +147,11 @@ inline void createShaderPipelines(IContext& context) {
     vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eClear, colorBlends);
 
     std::array bindings = {
-        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
                     1, vk::ShaderStageFlagBits::eMeshEXT),
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
+                    1, vk::ShaderStageFlagBits::eMeshEXT),
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
                     1, vk::ShaderStageFlagBits::eMeshEXT) };
     vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
@@ -183,4 +186,51 @@ inline void destroyShaderPipelines(IContext& context) {
     context.device.destroy(context.defaultDescriptorSetLayout);
     context.device.destroy(context.defaultPipelineLayout);
     context.device.destroy(context.wireframePipeline);
+}
+
+inline void updateCamera(IContext& context) {
+    glm::mat4* cameraMap = (glm::mat4*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
+    const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
+    *cameraMap = glm::perspective(glm::radians(90.0f), aspect, 0.01f, 1000.0f) *
+        glm::lookAt(glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, -1.0f, 0.0f }, glm::vec3{ 0.0f, 0.0f, 1.0f });
+    context.device.unmapMemory(context.cameraStagingMemory);
+
+    const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
+    vk::CommandBufferBeginInfo beginInfo;
+    buffer.begin(beginInfo);
+    vk::BufferCopy bufferCopy(0, 0, sizeof(glm::mat4));
+    buffer.copyBuffer(context.stagingCamera, context.uniformCamera, bufferCopy);
+    buffer.end();
+    
+    std::array buffers = { buffer };
+    vk::SubmitInfo submitInfo({}, {}, buffers, {});
+    context.primaryQueue.submit(submitInfo, fence);
+    const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
+    if (result != vk::Result::eSuccess)
+        throw std::runtime_error("Wait for fence failed!");
+    context.device.resetFences(fence);
+}
+
+inline void createBuffer(IContext& context) {
+    std::array queueFamily = { context.primaryFamilyIndex };
+    vk::BufferCreateInfo bufferCreateInfo({}, sizeof(glm::mat4), vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, queueFamily);
+    context.stagingCamera = context.device.createBuffer(bufferCreateInfo);
+    bufferCreateInfo.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eUniformBuffer;
+    context.uniformCamera = context.device.createBuffer(bufferCreateInfo);
+    const auto stagingSize = context.device.getBufferMemoryRequirements(context.stagingCamera).size;
+    const auto uniformSize = context.device.getBufferMemoryRequirements(context.uniformCamera).size;
+
+    context.cameraStagingMemory = context.requestMemory(stagingSize, vk::MemoryPropertyFlagBits::eHostVisible);
+    context.cameraMemory = context.requestMemory(uniformSize, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    context.device.bindBufferMemory(context.stagingCamera, context.cameraStagingMemory, 0);
+    context.device.bindBufferMemory(context.uniformCamera, context.cameraMemory, 0);
+
+    updateCamera(context);
+}
+
+inline void destroyBuffer(IContext& context) {
+    context.device.freeMemory(context.cameraMemory);
+    context.device.freeMemory(context.cameraStagingMemory);
+    context.device.destroy(context.uniformCamera);
+    context.device.destroy(context.stagingCamera);
 }

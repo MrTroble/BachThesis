@@ -2,15 +2,18 @@
 
 #extension GL_EXT_mesh_shader : require
 
-layout (local_size_x=128, local_size_y=1, local_size_z=1) in;
+layout (local_size_x=128) in;
 
 layout (lines) out;
 layout (max_vertices=4, max_primitives=6) out;
 
-layout (binding=0) buffer Index {
+layout (binding=0) uniform Camera {
+    mat4 mvp;
+} camera;
+layout (binding=1) buffer Index {
     uvec4 data[];
 } index;
-layout (binding=1) buffer Vertex {
+layout (binding=2) buffer Vertex {
     vec4 vertexData[];
 } vertex;
 
@@ -29,7 +32,7 @@ void main() {
     gl_PrimitiveLineIndicesEXT[5] = uvec2(2, 3);
 
     for(uint x = 0; x < 4; x++) {
-        gl_MeshVerticesEXT[x].gl_Position = vertex.vertexData[tetrahedron[x]];
+        gl_MeshVerticesEXT[x].gl_Position = vertex.vertexData[tetrahedron[x]] * camera.mvp;
     }
     SetMeshOutputsEXT(4, 6);
 }

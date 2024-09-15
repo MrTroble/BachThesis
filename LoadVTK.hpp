@@ -101,14 +101,19 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, context.defaultDescriptorSetLayout);
     const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
+    vk::DescriptorBufferInfo descriptorCameraInfo(context.uniformCamera, 0, VK_WHOLE_SIZE);
     vk::DescriptorBufferInfo descriptorIndexInfo(localIndexBuffer, 0, VK_WHOLE_SIZE);
     vk::DescriptorBufferInfo descriptorVertexInfo(localVertexBuffer, 0, vertexByteSize);
-    vk::WriteDescriptorSet writeIndexDescriptorSets(descriptor[0], 0, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorIndexInfo);
-    vk::WriteDescriptorSet writeVertexDescriptorSets(descriptor[0], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorVertexInfo);
-    std::array writeUpdateInfos = { writeIndexDescriptorSets,  writeVertexDescriptorSets };
+    vk::WriteDescriptorSet writeCameraSets(descriptor[0], 0, 0, vk::DescriptorType::eUniformBuffer, {}, descriptorCameraInfo);
+    vk::WriteDescriptorSet writeIndexDescriptorSets(descriptor[0], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorIndexInfo);
+    vk::WriteDescriptorSet writeVertexDescriptorSets(descriptor[0], 2, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorVertexInfo);
+    std::array writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets };
     context.device.updateDescriptorSets(writeUpdateInfos, {});
 
     VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, descriptor[0]};
-    context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
+    const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
+    if (result != vk::Result::eSuccess)
+        throw std::runtime_error("Vulkan Error");
+    context.device.resetFences(fence);
     return file;
 }
