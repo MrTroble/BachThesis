@@ -22,7 +22,7 @@ layout(push_constant) uniform PushConsts {
 } push;
 
 void main() {
-    const uint i = gl_LocalInvocationIndex.x;
+    const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
     gl_PrimitiveLineIndicesEXT[0] = uvec2(0, 1);
     gl_PrimitiveLineIndicesEXT[1] = uvec2(0, 2);
