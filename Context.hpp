@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 enum class DataCommandBuffer {
     DataUpload,
@@ -60,6 +61,11 @@ struct IContext {
     vk::DeviceMemory cameraMemory;
     vk::Buffer stagingCamera;
     vk::Buffer uniformCamera;
+    // Camera
+    glm::vec2 planes{ 0.01f, 100.0f};
+    float FOV = glm::radians(45.0f);
+    glm::vec3 position{ 0.0f, 1.0f, 0.0f };
+    glm::vec3 lookAtPositino{ 0.0f, 0.0f, 0.0f };
     // Queue
     vk::Queue primaryQueue;
 

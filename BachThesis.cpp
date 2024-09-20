@@ -192,7 +192,16 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGui::ShowDemoWindow();
+        if (ImGui::Begin("Debug Menue")) {
+            ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
+            ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
+            ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
+            ImGui::SliderFloat3("LookAtPos", &icontext.lookAtPositino.x, 0, 10.0f);
+        }
+        ImGui::End();
         ImGui::Render();
+
+        updateCamera(icontext);
 
         checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
         icontext.device.resetFences(fencesToCheck[nextImage.value]);

@@ -1,6 +1,7 @@
 #version 460
 
 #extension GL_EXT_mesh_shader : require
+#extension GL_EXT_fragment_shading_rate : disable
 
 layout (local_size_x=128) in;
 
@@ -21,6 +22,12 @@ layout(push_constant) uniform PushConsts {
     uint offset;
 } push;
 
+perprimitiveEXT out gl_MeshPerPrimitiveEXT {
+  int  gl_PrimitiveID;
+  int  gl_Layer;
+  int  gl_ViewportIndex;
+} gl_MeshPrimitivesEXT[];
+
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
@@ -33,6 +40,10 @@ void main() {
 
     for(uint x = 0; x < 4; x++) {
         gl_MeshVerticesEXT[x].gl_Position = vertex.vertexData[tetrahedron[x]] * camera.mvp;
+    }
+    const int groupID = int(i * 6);
+    for(int x = 0; x < 6; x++) {
+        gl_MeshPrimitivesEXT[x].gl_PrimitiveID = groupID + x;
     }
     SetMeshOutputsEXT(4, 6);
 }

@@ -37,7 +37,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
-    const vk::ClearValue clearColor(vk::ClearColorValue{ 0.0f, 0.0f, 0.0f, 0.0f });
+    const vk::ClearValue clearColor(vk::ClearColorValue{ 0.0f, 1.0f, 0.0f, 1.0f });
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
@@ -143,8 +143,8 @@ inline void createShaderPipelines(IContext& context) {
         vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f, 1.0f);
     vk::PipelineMultisampleStateCreateInfo multiplesampleState({}, vk::SampleCountFlagBits::e1);
     vk::PipelineDepthStencilStateCreateInfo depthState({}, false, false, vk::CompareOp::eNever, false, false);
-    std::array colorBlends = { vk::PipelineColorBlendAttachmentState() };
-    vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eClear, colorBlends);
+    std::array colorBlends = { vk::PipelineColorBlendAttachmentState(true, vk::BlendFactor::eOne, vk::BlendFactor::eZero) };
+    vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eCopy, colorBlends);
 
     std::array bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -191,8 +191,10 @@ inline void destroyShaderPipelines(IContext& context) {
 inline void updateCamera(IContext& context) {
     glm::mat4* cameraMap = (glm::mat4*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
     const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
-    *cameraMap = glm::perspective(glm::radians(90.0f), aspect, 0.01f, 1000.0f) *
-        glm::lookAt(glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, -1.0f, 0.0f }, glm::vec3{ 0.0f, 0.0f, 1.0f });
+    auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
+    projectionMatrix[1][1] *= -1;
+    *cameraMap = projectionMatrix * glm::lookAt(context.position, context.lookAtPositino, glm::vec3{ 0.0f, 0.0f, 1.0f })
+         * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1, 0.1, 0.1));
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
@@ -201,7 +203,7 @@ inline void updateCamera(IContext& context) {
     vk::BufferCopy bufferCopy(0, 0, sizeof(glm::mat4));
     buffer.copyBuffer(context.stagingCamera, context.uniformCamera, bufferCopy);
     buffer.end();
-    
+
     std::array buffers = { buffer };
     vk::SubmitInfo submitInfo({}, {}, buffers, {});
     context.primaryQueue.submit(submitInfo, fence);
