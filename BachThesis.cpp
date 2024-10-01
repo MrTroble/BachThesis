@@ -64,21 +64,33 @@ int main()
             break;
     }
 
+    const auto extensionsPresent = icontext.physicalDevice.enumerateDeviceExtensionProperties();
+    for (auto value : extensionsPresent)
+    {
+        if (std::string((char*)value.extensionName) == VK_EXT_MESH_SHADER_EXTENSION_NAME) {
+            icontext.meshShader == true;
+            break;
+        }
+    }
     const std::array queuePriorities{ 1.0f };
     const vk::DeviceQueueCreateInfo queueCreateInfo({}, icontext.primaryFamilyIndex, queuePriorities);
 
-    const std::array extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME };
-    vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures;
-    meshShaderFeatures.meshShader = true;
-    meshShaderFeatures.taskShader = true;
+    std::vector extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     vk::PhysicalDeviceFeatures2 features;
-    features.pNext = &meshShaderFeatures;
+    vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures;
+    if (icontext.meshShader) {
+        extensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+        meshShaderFeatures.meshShader = true;
+        meshShaderFeatures.taskShader = true;
+        features.pNext = &meshShaderFeatures;
+        icontext.dynamicLoader.vkCmdDrawMeshTasksEXT =
+            (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(icontext.device, "vkCmdDrawMeshTasksEXT");
+    }
+
     features.features.fillModeNonSolid = true;
     const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions, {}, &features);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
-    icontext.dynamicLoader.vkCmdDrawMeshTasksEXT = 
-        (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(icontext.device, "vkCmdDrawMeshTasksEXT");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     icontext.window = glfwCreateWindow(640u, 480u, applicationInfo.pApplicationName, NULL, NULL);
@@ -171,7 +183,7 @@ int main()
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
     std::vector vtkFiles = { loadVTK("assets/crystal.vtk", icontext) };
-    const ScopeExit cleanCrystal([&]() { for(auto &file : vtkFiles) file.unload(icontext); });
+    const ScopeExit cleanCrystal([&]() { for (auto& file : vtkFiles) file.unload(icontext); });
 
     while (!glfwWindowShouldClose(icontext.window))
     {
@@ -191,7 +203,7 @@ int main()
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow();
+        //ImGui::ShowDemoWindow();
         if (ImGui::Begin("Debug Menue")) {
             ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
             ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
@@ -207,7 +219,8 @@ int main()
         icontext.device.resetFences(fencesToCheck[nextImage.value]);
 
         rerecordPrimary(icontext, nextImage.value, vtkFiles);
-        const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | vk::PipelineStageFlagBits::eMeshShaderEXT };
+        const auto shaderStage = icontext.meshShader ? vk::PipelineStageFlagBits::eMeshShaderEXT : vk::PipelineStageFlagBits::eTopOfPipe;
+        const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | shaderStage };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
         icontext.primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
 

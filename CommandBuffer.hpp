@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <ranges>
 #include "Context.hpp"
 #include "backends/imgui_impl_vulkan.h"
 #include "LoadVTK.hpp"
@@ -33,6 +34,28 @@ inline void destroyPrimaryCommandBufferContext(IContext& context) {
     }
 }
 
+inline void recordMeshPipeline(const VTKFile& vtk, vk::CommandBuffer currentBuffer, IContext& context) {
+    const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
+    const size_t lastGroupAmount = vtk.amountOfTetrahedrons - workGroups * MAX_WORK_GROUPS;
+    for (size_t i = 0; i < workGroups; i++)
+    {
+        const uint32_t currentOffset = i * MAX_WORK_GROUPS;
+        currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
+        currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
+    }
+    if (lastGroupAmount > 0) {
+        const uint32_t currentOffset = workGroups * MAX_WORK_GROUPS;
+        currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
+        currentBuffer.drawMeshTasksEXT(lastGroupAmount, 1, 1, context.dynamicLoader);
+    }
+}
+
+inline void recordVertexPipeline(const VTKFile& vtk, vk::CommandBuffer currentBuffer, IContext& context) {
+    const uint32_t currentOffset = 0;
+    currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(uint32_t), &currentOffset);
+    currentBuffer.draw(vtk.amountOfTetrahedrons * 12, 1, 0, 0);
+}
+
 inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std::vector<VTKFile>& vtkFiles) {
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -44,20 +67,13 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
 
     for (const auto& vtk : vtkFiles)
     {
-        const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
-        const size_t lastGroupAmount = vtk.amountOfTetrahedrons - workGroups;
         currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context.wireframePipeline);
         currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context.defaultPipelineLayout, 0, vtk.descriptor, {});
-        for (size_t i = 0; i < workGroups; i++)
-        {
-            const uint32_t currentOffset = i * MAX_WORK_GROUPS;
-            currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
-            currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
+        if (context.meshShader) {
+            recordMeshPipeline(vtk, currentBuffer, context);
         }
-        if (lastGroupAmount > 0) {
-            const uint32_t currentOffset = workGroups * MAX_WORK_GROUPS;
-            currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
-            currentBuffer.drawMeshTasksEXT(lastGroupAmount, 1, 1, context.dynamicLoader);
+        else {
+            recordVertexPipeline(vtk, currentBuffer, context);
         }
     }
 
@@ -120,7 +136,12 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    for (const auto& name : { "test.frag.spv", "testMesh.spv" }) {
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv" };
+    const std::array meshShader = { "testMesh.spv" };
+    if (context.meshShader) {
+        std::ranges::copy(meshShader, std::back_inserter(shaderNames));
+    }
+    for (const auto& name : shaderNames) {
         const auto fileName = (std::filesystem::path("shader") / name).string();
         const auto loadValues = readFullFile(fileName);
         vk::ShaderModuleCreateInfo shaderModuleCreateInfo({}, loadValues.size(), (uint32_t*)loadValues.data());
@@ -136,6 +157,7 @@ inline void createShaderPipelines(IContext& context) {
         vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
         vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.spv"], "main"}
     };
+
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };
     vk::Viewport viewport(0, 0, (float)context.currentExtent.width, (float)context.currentExtent.height, 0.0f, 1.0f);
     vk::PipelineViewportStateCreateInfo viewportState({}, viewport, rect2d);
@@ -146,18 +168,21 @@ inline void createShaderPipelines(IContext& context) {
     std::array colorBlends = { vk::PipelineColorBlendAttachmentState(true, vk::BlendFactor::eOne, vk::BlendFactor::eZero) };
     vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eCopy, colorBlends);
 
+    const vk::ShaderStageFlagBits flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+
     std::array bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
-                    1, vk::ShaderStageFlagBits::eMeshEXT),
+                    1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
-                    1, vk::ShaderStageFlagBits::eMeshEXT),
+                    1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
-                    1, vk::ShaderStageFlagBits::eMeshEXT) };
+                    1, flagBitsForBindings) };
     vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
+    const auto shaderStageFlags = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
-    std::array pushConstantRanges = { vk::PushConstantRange{vk::ShaderStageFlagBits::eMeshEXT, 0, 2 * sizeof(uint32_t)} };
+    std::array pushConstantRanges = { vk::PushConstantRange{shaderStageFlags, 0, 2 * sizeof(uint32_t)} };
     vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConstantRanges);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
@@ -170,10 +195,25 @@ inline void createShaderPipelines(IContext& context) {
     createWirelessCreateInfo.pRasterizationState = &rasterizationState;
     createWirelessCreateInfo.pViewportState = &viewportState;
     createWirelessCreateInfo.renderPass = context.renderPass;
-    const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
-    context.wireframePipeline = result.value;
+    if (context.meshShader) {
+        const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        context.wireframePipeline = result.value;
+    }
+    else {
+        std::array noneMeshShaderStages = {
+            pipelineShaderStages[0],
+            vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eVertex, context.shaderModule.at("vertexWire.vert.spv"), "main"}
+        };
+        createWirelessCreateInfo.setStages(noneMeshShaderStages);
+        vk::PipelineVertexInputStateCreateInfo vertexInputState({}, {});
+        createWirelessCreateInfo.setPVertexInputState(&vertexInputState);
+        vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState({}, vk::PrimitiveTopology::eLineList);
+        createWirelessCreateInfo.setPInputAssemblyState(&inputAssemblyState);
+        const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        context.wireframePipeline = result.value;
+    }
 
-    const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 1);
+    const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 100);
     const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1, poolSize);
     context.descriptorPool = context.device.createDescriptorPool(descriptorPoolCreateInfo);
 }
@@ -194,7 +234,7 @@ inline void updateCamera(IContext& context) {
     auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
     projectionMatrix[1][1] *= -1;
     *cameraMap = projectionMatrix * glm::lookAt(context.position, context.lookAtPositino, glm::vec3{ 0.0f, 0.0f, 1.0f })
-         * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1, 0.1, 0.1));
+        * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1, 0.1, 0.1));
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

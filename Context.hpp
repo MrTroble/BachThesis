@@ -33,6 +33,8 @@ struct IContext {
     GLFWwindow* window;
     vk::DispatchLoaderDynamic dynamicLoader;
     vk::Instance instance;
+    // Use mesh shader
+    bool meshShader = false;
     // Device Creation
     vk::Device device;
     vk::PhysicalDevice physicalDevice;

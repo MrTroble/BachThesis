@@ -31,10 +31,11 @@ target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
 
 message(${Vulkan_GLSLC_EXECUTABLE})
-add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh"
+add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh" "vertexWire.vert"
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
 configure_file("shader/test.frag.spv" "shader/test.frag.spv" COPYONLY)
 configure_file("shader/testMesh.spv" "shader/testMesh.spv" COPYONLY)
+configure_file("shader/vertexWire.vert.spv" "shader/vertexWire.vert.spv" COPYONLY)
 configure_file("assets/crystal.vtk" "assets/crystal.vtk" COPYONLY)
 
 add_executable(BachThesis "BachThesis.cpp")
