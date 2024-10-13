@@ -67,8 +67,9 @@ int main()
     const auto extensionsPresent = icontext.physicalDevice.enumerateDeviceExtensionProperties();
     for (auto value : extensionsPresent)
     {
-        if (std::string((char*)value.extensionName) == VK_EXT_MESH_SHADER_EXTENSION_NAME) {
-            icontext.meshShader == true;
+        const std::string extName((char*)value.extensionName);
+        if (extName == VK_EXT_MESH_SHADER_EXTENSION_NAME) {
+            icontext.meshShader = true;
             break;
         }
     }
@@ -83,14 +84,17 @@ int main()
         meshShaderFeatures.meshShader = true;
         meshShaderFeatures.taskShader = true;
         features.pNext = &meshShaderFeatures;
-        icontext.dynamicLoader.vkCmdDrawMeshTasksEXT =
-            (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(icontext.device, "vkCmdDrawMeshTasksEXT");
     }
 
     features.features.fillModeNonSolid = true;
     const vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, extensions, {}, &features);
     icontext.device = icontext.physicalDevice.createDevice(deviceCreateInfo);
     const ScopeExit cleanDevice([&]() { icontext.device.destroy(); });
+
+    if (icontext.meshShader) {
+        icontext.dynamicLoader.vkCmdDrawMeshTasksEXT =
+            (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(icontext.device, "vkCmdDrawMeshTasksEXT");
+    }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     icontext.window = glfwCreateWindow(640u, 480u, applicationInfo.pApplicationName, NULL, NULL);
