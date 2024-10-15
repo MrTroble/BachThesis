@@ -15,6 +15,8 @@ inline void checkErrorOrRecreate(vk::Result result, IContext& context) {
         const auto capabilities = context.physicalDevice.getSurfaceCapabilitiesKHR(context.surface);
         context.currentExtent = capabilities.currentExtent;
         recreateSwapchain(context);
+        context.device.waitIdle();
+        recreatePipeline(context);
         return;
     }
     if (result != vk::Result::eSuccess) {

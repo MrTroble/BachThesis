@@ -150,12 +150,16 @@ inline void loadAndAdd(IContext& context) {
     }
 }
 
-inline void createShaderPipelines(IContext& context) {
-    loadAndAdd(context);
-
+inline void recreatePipeline(IContext& context) {
+    if (context.wireframePipeline) {
+        context.device.destroy(context.wireframePipeline);
+    }
+    if (context.defaultPipelineLayout) {
+        context.device.destroy(context.defaultPipelineLayout);
+    }
     std::array pipelineShaderStages = {
-        vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
-        vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.spv"], "main"}
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.spv"], "main"}
     };
 
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };
@@ -165,21 +169,9 @@ inline void createShaderPipelines(IContext& context) {
         vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise, false, 0.0f, 0.0f, 0.0f, 1.0f);
     vk::PipelineMultisampleStateCreateInfo multiplesampleState({}, vk::SampleCountFlagBits::e1);
     vk::PipelineDepthStencilStateCreateInfo depthState({}, true, false, vk::CompareOp::eAlways);
-    std::array colorBlends = { vk::PipelineColorBlendAttachmentState(true, vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd, 
+    std::array colorBlends = { vk::PipelineColorBlendAttachmentState(true, vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
                                vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd, vk::FlagTraits<vk::ColorComponentFlagBits>::allFlags) };
     vk::PipelineColorBlendStateCreateInfo colorBlend({}, false, vk::LogicOp::eCopy, colorBlends);
-
-    const vk::ShaderStageFlagBits flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
-
-    std::array bindings = {
-        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
-                    1, flagBitsForBindings),
-        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
-                    1, flagBitsForBindings),
-        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
-                    1, flagBitsForBindings) };
-    vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
-    context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
     const auto shaderStageFlags = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
@@ -213,6 +205,25 @@ inline void createShaderPipelines(IContext& context) {
         const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
         context.wireframePipeline = result.value;
     }
+
+}
+
+inline void createShaderPipelines(IContext& context) {
+    loadAndAdd(context);
+
+    const vk::ShaderStageFlagBits flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+
+    const std::array bindings = {
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings) };
+    const vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
+    context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
+
+    recreatePipeline(context);
 
     const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 100);
     const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1, poolSize);
