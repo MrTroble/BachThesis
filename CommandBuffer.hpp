@@ -233,8 +233,8 @@ inline void updateCamera(IContext& context) {
     const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
     auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
     projectionMatrix[1][1] *= -1;
-    *cameraMap = projectionMatrix * glm::lookAt(context.position, context.lookAtPositino, glm::vec3{ 0.0f, 0.0f, 1.0f })
-        * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1, 0.1, 0.1));
+    *cameraMap = projectionMatrix * glm::lookAt(context.position, context.lookAtPosition, glm::vec3{ 0.0f, 1.0f, 0.0f }) 
+                 * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

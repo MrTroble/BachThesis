@@ -11,6 +11,15 @@ set(CMAKE_CXX_STANDARD 20)
 
 include(FindVulkan)
 
+if(false)
+add_compile_options("/fsanitize=address")
+add_link_options("/fsanitize=address")
+if(true)
+add_compile_definitions(_DISABLE_VECTOR_ANNOTATION=1)
+add_compile_definitions(_DISABLE_STRING_ANNOTATION=1)
+endif()
+endif()
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
