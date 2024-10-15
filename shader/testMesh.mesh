@@ -39,7 +39,7 @@ void main() {
     gl_PrimitiveLineIndicesEXT[5] = uvec2(2, 3);
 
     for(uint x = 0; x < 4; x++) {
-        gl_MeshVerticesEXT[x].gl_Position = vertex.vertexData[tetrahedron[x]] * camera.mvp;
+        gl_MeshVerticesEXT[x].gl_Position = vec4((vertex.vertexData[tetrahedron[x]] * camera.mvp).xy, 0, 1.0f);
     }
     const int groupID = int(i * 6);
     for(int x = 0; x < 6; x++) {
