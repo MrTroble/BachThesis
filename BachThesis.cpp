@@ -10,19 +10,20 @@
 
 using namespace std;
 
-inline void checkErrorOrRecreate(vk::Result result, IContext& context) {
+inline bool checkErrorOrRecreate(vk::Result result, IContext& context) {
     if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
         const auto capabilities = context.physicalDevice.getSurfaceCapabilitiesKHR(context.surface);
         context.currentExtent = capabilities.currentExtent;
         recreateSwapchain(context);
         context.device.waitIdle();
         recreatePipeline(context);
-        return;
+        return true;
     }
     if (result != vk::Result::eSuccess) {
         std::cerr << "Vulkan Error with " << vk::to_string(result) << std::endl;
         throw std::runtime_error("Vulkan Error!");
     }
+    return false;
 }
 
 int main()
@@ -134,7 +135,7 @@ int main()
     const ScopeExit cleanBuffers([&]() { destroyBuffer(icontext); });
 
     const auto waitSemaphore = icontext.device.createSemaphore({});
-    const auto acquireSemaphore = icontext.device.createSemaphore({});
+    auto acquireSemaphore = icontext.device.createSemaphore({});
     const ScopeExit cleanupSemaphore([&]() {
         icontext.device.destroy(waitSemaphore);
         icontext.device.destroy(acquireSemaphore);
@@ -184,7 +185,7 @@ int main()
     std::vector<vk::Fence> fencesToCheck(icontext.amountOfImages);
     for (auto& fence : fencesToCheck)
     {
-        fence = icontext.device.createFence({ vk::FenceCreateFlagBits::eSignaled });
+        fence = icontext.device.createFence({});
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
@@ -204,7 +205,13 @@ int main()
         }
 
         const auto nextImage = icontext.device.acquireNextImageKHR(icontext.swapchain, std::numeric_limits<uint64_t>().max(), acquireSemaphore);
-        checkErrorOrRecreate(nextImage.result, icontext);
+        if (checkErrorOrRecreate(nextImage.result, icontext)) {
+            icontext.device.destroy(acquireSemaphore);
+            acquireSemaphore = icontext.device.createSemaphore({});
+            continue;
+        }
+
+        updateCamera(icontext);
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -219,21 +226,18 @@ int main()
         ImGui::End();
         ImGui::Render();
 
-        updateCamera(icontext);
-
-        checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
-        icontext.device.resetFences(fencesToCheck[nextImage.value]);
-
         rerecordPrimary(icontext, nextImage.value, vtkFiles);
         const auto shaderStage = icontext.meshShader ? vk::PipelineStageFlagBits::eMeshShaderEXT : vk::PipelineStageFlagBits::eTopOfPipe;
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | shaderStage };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
         icontext.primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
 
+        checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
+        icontext.device.resetFences(fencesToCheck[nextImage.value]);
+
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
         checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
     }
-    checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck, true, std::numeric_limits<uint64_t>().max()), icontext);
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
