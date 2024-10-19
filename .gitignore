@@ -31,6 +31,5 @@
 *.out
 *.app
 /.vs
-/out/build/x64-debug
-/submodules/imgui
-/out/build/x64-release
+/out
+/submodules

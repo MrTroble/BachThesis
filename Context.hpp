@@ -56,8 +56,9 @@ struct IContext {
     std::unordered_map<std::string, vk::ShaderModule> shaderModule;
     vk::DescriptorSetLayout defaultDescriptorSetLayout;
     vk::PipelineLayout defaultPipelineLayout;
+    vk::DescriptorPool descriptorPool;    
     vk::Pipeline wireframePipeline;
-    vk::DescriptorPool descriptorPool;
+    vk::Pipeline proxyPipeline;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;

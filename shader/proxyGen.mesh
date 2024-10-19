@@ -27,4 +27,11 @@ layout(push_constant) uniform PushConsts {
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
+       
+    for(uint x = 0; x < 4; x++) {
+        vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
+        vec4 screen = camera.view * world;
+        vec4 projection = camera.proj * screen;
+    }
+
 }
