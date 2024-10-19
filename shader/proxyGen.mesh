@@ -1,0 +1,30 @@
+#version 460
+
+#extension GL_EXT_mesh_shader : require
+#extension GL_EXT_fragment_shading_rate : disable
+
+layout (local_size_x=128) in;
+
+layout (triangles) out;
+layout (max_vertices=5, max_primitives=4) out;
+
+layout (binding=0) uniform Camera {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} camera;
+layout (binding=1) buffer Index {
+    uvec4 data[];
+} index;
+layout (binding=2) buffer Vertex {
+    vec4 vertexData[];
+} vertex;
+
+layout(push_constant) uniform PushConsts {
+    uint offset;
+} push;
+
+void main() {
+    const uint i = gl_WorkGroupID.x;
+    const uvec4 tetrahedron = index.data[i + push.offset];
+}

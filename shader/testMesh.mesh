@@ -9,7 +9,9 @@ layout (lines) out;
 layout (max_vertices=4, max_primitives=6) out;
 
 layout (binding=0) uniform Camera {
-    mat4 mvp;
+    mat4 model;
+    mat4 view;
+    mat4 proj;
 } camera;
 layout (binding=1) buffer Index {
     uvec4 data[];
@@ -22,12 +24,6 @@ layout(push_constant) uniform PushConsts {
     uint offset;
 } push;
 
-perprimitiveEXT out gl_MeshPerPrimitiveEXT {
-  int  gl_PrimitiveID;
-  int  gl_Layer;
-  int  gl_ViewportIndex;
-} gl_MeshPrimitivesEXT[];
-
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
@@ -39,11 +35,10 @@ void main() {
     gl_PrimitiveLineIndicesEXT[5] = uvec2(2, 3);
 
     for(uint x = 0; x < 4; x++) {
-        gl_MeshVerticesEXT[x].gl_Position = vec4((vertex.vertexData[tetrahedron[x]] * camera.mvp).xy, 0, 1.0f);
-    }
-    const int groupID = int(i * 6);
-    for(int x = 0; x < 6; x++) {
-        gl_MeshPrimitivesEXT[x].gl_PrimitiveID = groupID + x;
+        vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
+        vec4 screen = camera.view * world;
+        vec4 projection = camera.proj * screen;
+        gl_MeshVerticesEXT[x].gl_Position = projection;
     }
     SetMeshOutputsEXT(4, 6);
 }

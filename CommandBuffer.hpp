@@ -240,19 +240,26 @@ inline void destroyShaderPipelines(IContext& context) {
     context.device.destroy(context.wireframePipeline);
 }
 
+struct CameraInfo {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 inline void updateCamera(IContext& context) {
-    glm::mat4* cameraMap = (glm::mat4*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
+    CameraInfo* cameraMap = (CameraInfo*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
     const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
     auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
     projectionMatrix[1][1] *= -1;
-    *cameraMap = projectionMatrix * glm::lookAt(context.position, context.lookAtPosition, glm::vec3{ 0.0f, 1.0f, 0.0f })
-        * glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
+    cameraMap->proj = projectionMatrix;
+    cameraMap->view = glm::lookAt(context.position, context.lookAtPosition, glm::vec3{ 0.0f, 1.0f, 0.0f });
+    cameraMap->model = glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
     vk::CommandBufferBeginInfo beginInfo;
     buffer.begin(beginInfo);
-    vk::BufferCopy bufferCopy(0, 0, sizeof(glm::mat4));
+    vk::BufferCopy bufferCopy(0, 0, sizeof(CameraInfo));
     buffer.copyBuffer(context.stagingCamera, context.uniformCamera, bufferCopy);
     buffer.end();
 
@@ -267,7 +274,7 @@ inline void updateCamera(IContext& context) {
 
 inline void createBuffer(IContext& context) {
     std::array queueFamily = { context.primaryFamilyIndex };
-    vk::BufferCreateInfo bufferCreateInfo({}, sizeof(glm::mat4), vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, queueFamily);
+    vk::BufferCreateInfo bufferCreateInfo({}, sizeof(CameraInfo), vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, queueFamily);
     context.stagingCamera = context.device.createBuffer(bufferCreateInfo);
     bufferCreateInfo.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eUniformBuffer;
     context.uniformCamera = context.device.createBuffer(bufferCreateInfo);
