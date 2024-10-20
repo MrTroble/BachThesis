@@ -218,10 +218,26 @@ int main()
         ImGui::NewFrame();
         //ImGui::ShowDemoWindow();
         if (ImGui::Begin("Debug Menue")) {
-            ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
-            ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
-            ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
-            ImGui::SliderFloat3("LookAtPos", &icontext.lookAtPosition.x, 0, 10.0f);
+            const auto currentName = std::to_string(icontext.type);
+            if (ImGui::BeginCombo("Pipeline", currentName.c_str())) {
+                const size_t currentSelected = (size_t)icontext.type;
+                for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
+                {
+                    const auto currentType = (PipelineType)i;
+                    const auto name = std::to_string(currentType);
+                    const bool isSelected = (currentSelected == i);
+                    if (ImGui::Selectable(name.c_str(), isSelected))
+                        icontext.type = currentType;
+                    if (isSelected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::CollapsingHeader("Camera")) {
+                ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
+                ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
+                ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
+                ImGui::SliderFloat3("LookAtPos", &icontext.lookAtPosition.x, 0, 10.0f);
+            }
         }
         ImGui::End();
         ImGui::Render();

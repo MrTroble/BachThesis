@@ -25,9 +25,24 @@ struct CommandBufferContext {
     }
 };
 
-struct AllocationInfo {
-
+enum class PipelineType {
+    Wireframe, Proxy
 };
+constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::Proxy + 1;
+
+namespace std {
+    inline std::string to_string(PipelineType type) {
+        switch (type)
+        {
+        case PipelineType::Wireframe:
+            return "Wireframe";
+        case PipelineType::Proxy:
+            return "Proxy";
+        default:
+            throw std::runtime_error("Pipeline type not found");
+        }
+    }
+}
 
 struct IContext {
     GLFWwindow* window;
@@ -69,6 +84,8 @@ struct IContext {
     float FOV = glm::radians(45.0f);
     glm::vec3 position{ 1.0f, 0.0f, 0.0f };
     glm::vec3 lookAtPosition{ 0.0f, 0.0f, 0.0f };
+    // Settings
+    PipelineType type = PipelineType::Wireframe;
     // Queue
     vk::Queue primaryQueue;
 

@@ -65,9 +65,21 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
 
+    const vk::Pipeline currentPipeline = ([&]() {
+        switch (context.type)
+        {
+        case PipelineType::Wireframe:
+            return context.wireframePipeline;
+        case PipelineType::Proxy:
+            return context.proxyPipeline;
+        default:
+            throw std::runtime_error("Pipeline type not found");
+        }
+        })();
+    currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline);
+
     for (const auto& vtk : vtkFiles)
     {
-        currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context.wireframePipeline);
         currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context.defaultPipelineLayout, 0, vtk.descriptor, {});
         if (context.meshShader) {
             recordMeshPipeline(vtk, currentBuffer, context);
@@ -191,6 +203,7 @@ inline void recreatePipeline(IContext& context) {
         const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
         context.wireframePipeline = result.value;
         createWirelessCreateInfo.setStages(proxyPipelineShaderStages);
+        rasterizationState.polygonMode = vk::PolygonMode::eFill;
         const auto result2 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
         context.proxyPipeline = result2.value;
     }
