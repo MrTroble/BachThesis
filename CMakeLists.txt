@@ -2,7 +2,7 @@
 
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+  #set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
 project ("BachThesis")
@@ -40,7 +40,7 @@ target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
 
 message(${Vulkan_GLSLC_EXECUTABLE})
-add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh" "vertexWire.vert" "proxyGen.mesh"
+add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh" "vertexWire.vert" "proxyGen.mesh" "debug.frag"
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
 file(COPY "shader" DESTINATION "./")
 

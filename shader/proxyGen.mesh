@@ -1,7 +1,6 @@
 #version 460
 
 #extension GL_EXT_mesh_shader : require
-#extension GL_EXT_fragment_shading_rate : disable
 
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
@@ -10,6 +9,8 @@ layout (local_size_x=128) in;
 
 layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
+
+layout(location=0) perprimitiveEXT out vec3 lambdasOut[];
 
 layout (binding=0) uniform Camera {
     mat4 model;
@@ -53,7 +54,7 @@ void main() {
     uint inner = 0;
     uint addition = 0;
     for(uint x = 0; x < 4; x++) {
-        if(!onAABB(screenSpace[x], aabbMin, aabbMax)) {
+        if(addition == 0 && !onAABB(screenSpace[x], aabbMin, aabbMax)) {
             addition = 1;
             inner = x;
             continue;
@@ -64,14 +65,21 @@ void main() {
     vec2 dP0 = screenSpace[triangleOuter[0]] - P2;
     vec2 dP1 = screenSpace[triangleOuter[1]] - P2;
     vec2 dP3 = screenSpace[inner] - P2;
-    float faktor = 1/(dP0.y * dP1.x - dP0.x * dP1.y);
+    float faktor = 1.0/(dP0.y * dP1.x - dP0.x * dP1.y);
     // Multiply inverse
     vec2 lambdas = faktor * vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y);
-    if(lambdas.x < 0 || lambdas.y < 0 || lambdas.x + lambdas.y > 1) {
+    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambdas.x >= 1.0f - lambdas.y) {
         // Case 2
-
+        
     } else {
         // Case 1
-     
+        gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], inner);
+        gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], inner);
+        gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], inner);
+        vec3 lambdasFin = vec3(triangleOuter[0], triangleOuter[1], triangleOuter[2]);
+        lambdasOut[0] = lambdasFin;
+        lambdasOut[1] = lambdasFin;
+        lambdasOut[2] = lambdasFin;
+        SetMeshOutputsEXT(4, 3);
     }
 }

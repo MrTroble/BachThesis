@@ -148,7 +148,7 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv" };
     const std::array meshShader = { "testMesh.spv", "proxyGen.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -176,7 +176,7 @@ inline void recreatePipeline(IContext& context) {
     };
 
     std::array proxyPipelineShaderStages = {
-    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["debug.frag.spv"], "main"},
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.spv"], "main"}
     };
 
@@ -201,10 +201,14 @@ inline void recreatePipeline(IContext& context) {
     createWirelessCreateInfo.renderPass = context.renderPass;
     if (context.meshShader) {
         const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        if(result.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
         context.wireframePipeline = result.value;
         createWirelessCreateInfo.setStages(proxyPipelineShaderStages);
         rasterizationState.polygonMode = vk::PolygonMode::eFill;
         const auto result2 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        if (result2.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
         context.proxyPipeline = result2.value;
     }
     else {
