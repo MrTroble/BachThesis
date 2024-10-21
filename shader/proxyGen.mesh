@@ -49,14 +49,16 @@ void main() {
         gl_MeshVerticesEXT[x].gl_Position = projection;
     }
     
+    uint triangleOuter[3];
+    uint inner = 0;
     uint addition = 0;
     for(uint x = 0; x < 4; x++) {
-        if(!onAABB(screenSpace[x])) {
-            notUsing = x;
-            break;
+        if(!onAABB(screenSpace[x], aabbMin, aabbMax)) {
+            addition = 1;
+            inner = x;
+            continue;
         }
+        triangleOuter[x - addition] = x;
     }
-
-    
 
 }
