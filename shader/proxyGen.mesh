@@ -3,6 +3,9 @@
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_fragment_shading_rate : disable
 
+#define FLT_MAX 3.402823466e+38
+#define FLT_MIN 1.175494351e-38
+
 layout (local_size_x=128) in;
 
 layout (triangles) out;
@@ -24,14 +27,36 @@ layout(push_constant) uniform PushConsts {
     uint offset;
 } push;
 
+bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
+    return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
+}
+
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
-       
+    
+    vec2 screenSpace[4];
+    vec2 aabbMax = vec2(FLT_MIN, FLT_MIN);
+    vec2 aabbMin = vec2(FLT_MAX, FLT_MAX);
     for(uint x = 0; x < 4; x++) {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
+        vec2 screen2D = screen.xy / screen.w;
+        aabbMax = max(screen2D, aabbMax);
+        aabbMin = min(screen2D, aabbMin);
+        screenSpace[x] = screen2D;
         vec4 projection = camera.proj * screen;
+        gl_MeshVerticesEXT[x].gl_Position = projection;
     }
+    
+    uint addition = 0;
+    for(uint x = 0; x < 4; x++) {
+        if(!onAABB(screenSpace[x])) {
+            notUsing = x;
+            break;
+        }
+    }
+
+    
 
 }
