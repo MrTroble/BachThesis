@@ -60,5 +60,18 @@ void main() {
         }
         triangleOuter[x - addition] = x;
     }
+    vec2 P2 = screenSpace[triangleOuter[2]];
+    vec2 dP0 = screenSpace[triangleOuter[0]] - P2;
+    vec2 dP1 = screenSpace[triangleOuter[1]] - P2;
+    vec2 dP3 = screenSpace[inner] - P2;
+    float faktor = 1/(dP0.y * dP1.x - dP0.x * dP1.y);
+    // Multiply inverse
+    vec2 lambdas = faktor * vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y);
+    if(lambdas.x < 0 || lambdas.y < 0 || lambdas.x + lambdas.y > 1) {
+        // Case 2
 
+    } else {
+        // Case 1
+     
+    }
 }
