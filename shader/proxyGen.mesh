@@ -32,34 +32,49 @@ bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
     return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
 }
 
+float distToLine(vec2 l1, vec2 l2, vec2 p) {
+    vec2 Md = l2 - l1;
+    vec2 n = vec2(Md.y, -Md.x);
+    vec2 dir = l1 - p;
+    return abs(dot(normalize(n), dir));
+}
+
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
     
     vec2 screenSpace[4];
-    vec2 aabbMax = vec2(FLT_MIN, FLT_MIN);
-    vec2 aabbMin = vec2(FLT_MAX, FLT_MAX);
+    uint mostLeft = 0;
+    float currentX = FLT_MAX;
+    uint mostRight = 0;
+    float currentXRight = -FLT_MAX;
     for(uint x = 0; x < 4; x++) {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
         vec2 screen2D = screen.xy / screen.w;
-        aabbMax = max(screen2D, aabbMax);
-        aabbMin = min(screen2D, aabbMin);
+        if(currentX > screen2D.x) {
+            mostLeft = x;
+            currentX = screen2D.x;
+        }
+        if(currentXRight < screen2D.x) {
+            mostRight = x;
+            currentXRight = screen2D.x;
+        }
         screenSpace[x] = screen2D;
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = projection;
     }
     
-    uint triangleOuter[3];
-    uint inner = 0;
-    uint addition = 0;
+    float distanceToLine = 0;
+    uint mostDistantOne = 0;
     for(uint x = 0; x < 4; x++) {
-        if(addition == 0 && !onAABB(screenSpace[x], aabbMin, aabbMax)) {
-            addition = 1;
-            inner = x;
+        if(mostRight == x || mostLeft == x) {
             continue;
         }
-        triangleOuter[x - addition] = x;
+        float dist = distToLine(mostLeft, mostRight, screenSpace[x]);
+        if(dist > distanceToLine) {
+            
+        }
     }
     vec2 P2 = screenSpace[triangleOuter[2]];
     vec2 dP0 = screenSpace[triangleOuter[0]] - P2;
@@ -76,7 +91,7 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], inner);
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], inner);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], inner);
-        vec3 lambdasFin = vec3(triangleOuter[0], triangleOuter[1], triangleOuter[2]);
+        vec3 lambdasFin = vec3(lambdas, 1 - lambdas.x - lambdas.y);
         lambdasOut[0] = lambdasFin;
         lambdasOut[1] = lambdasFin;
         lambdasOut[2] = lambdasFin;
