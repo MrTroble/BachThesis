@@ -51,7 +51,9 @@ void main() {
     for(uint x = 0; x < 4; x++) {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
-        vec2 screen2D = screen.xy / screen.w;
+        vec4 projection = camera.proj * screen;
+        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
+        vec2 screen2D = projection.xy;
         if(currentX > screen2D.x) {
             mostLeft = x;
             currentX = screen2D.x;
@@ -61,40 +63,46 @@ void main() {
             currentXRight = screen2D.x;
         }
         screenSpace[x] = screen2D;
-        vec4 projection = camera.proj * screen;
-        gl_MeshVerticesEXT[x].gl_Position = projection;
     }
     
     float distanceToLine = 0;
     uint mostDistantOne = 0;
+    uint otherDist = 4;
     for(uint x = 0; x < 4; x++) {
         if(mostRight == x || mostLeft == x) {
             continue;
         }
-        float dist = distToLine(mostLeft, mostRight, screenSpace[x]);
+        float dist = distToLine(screenSpace[mostLeft], screenSpace[mostRight], screenSpace[x]);
         if(dist > distanceToLine) {
-            
+            distanceToLine = dist;
+            mostDistantOne = x;
+            if(otherDist == 4)
+                otherDist = mostDistantOne;
+        } else {
+            otherDist = x;
         }
     }
-    vec2 P2 = screenSpace[triangleOuter[2]];
-    vec2 dP0 = screenSpace[triangleOuter[0]] - P2;
-    vec2 dP1 = screenSpace[triangleOuter[1]] - P2;
-    vec2 dP3 = screenSpace[inner] - P2;
-    float faktor = 1.0/(dP0.y * dP1.x - dP0.x * dP1.y);
+    uint triangleOuter[3] = { mostLeft, mostRight, mostDistantOne };
+
+    vec2 P2 = screenSpace[mostDistantOne];
+    vec2 dP0 = screenSpace[mostLeft] - P2;
+    vec2 dP1 = screenSpace[mostRight] - P2;
+    vec2 dP3 = screenSpace[otherDist] - P2;
+    float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
     // Multiply inverse
-    vec2 lambdas = faktor * vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y);
-    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambdas.x >= 1.0f - lambdas.y) {
+    vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
+    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || 0.0f >= 1.0f - lambdas.y - lambdas.x) {
         // Case 2
         
     } else {
         // Case 1
-        gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], inner);
-        gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], inner);
-        gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], inner);
-        vec3 lambdasFin = vec3(lambdas, 1 - lambdas.x - lambdas.y);
-        lambdasOut[0] = lambdasFin;
-        lambdasOut[1] = lambdasFin;
-        lambdasOut[2] = lambdasFin;
+        gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], otherDist);
+        gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
+        gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
+        //vec3 lambdasFin = vec3(otherDist, 1.0f - lambdas.y - lambdas.x);
+        lambdasOut[0] = vec3(screenSpace[mostLeft], lambdas.x);
+        lambdasOut[1] = vec3(screenSpace[mostRight], lambdas.y);
+        lambdasOut[2] = vec3(screenSpace[mostDistantOne], 1.0f - lambdas.y - lambdas.x);
         SetMeshOutputsEXT(4, 3);
     }
 }
