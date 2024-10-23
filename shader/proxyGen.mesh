@@ -10,6 +10,7 @@ layout (local_size_x=128) in;
 layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
+// Debug Out
 layout(location=0) perprimitiveEXT out vec3 lambdasOut[];
 
 layout (binding=0) uniform Camera {
@@ -48,12 +49,15 @@ void main() {
     float currentX = FLT_MAX;
     uint mostRight = 0;
     float currentXRight = -FLT_MAX;
+    bool allNot = false;
     for(uint x = 0; x < 4; x++) {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = projection;
         vec2 screen2D = projection.xy / projection.w;
+        if(!allNot && !(screen2D.x < -1 || screen.x > 1 || screen2D.y < -1 || screen.y > 1))
+            allNot = true;
         if(currentX > screen2D.x) {
             mostLeft = x;
             currentX = screen2D.x;
@@ -64,6 +68,9 @@ void main() {
         }
         screenSpace[x] = screen2D;
     }
+    // Clipping
+    if(!allNot)
+        return;
     
     float distanceToLine = 0;
     uint mostDistantOne = 0;
@@ -99,7 +106,6 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], otherDist);
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
-        //vec3 lambdasFin = vec3(otherDist, 1.0f - lambdas.y - lambdas.x);
         lambdasOut[0] = vec3(lambdas, 1);
         lambdasOut[1] = vec3(lambdas, 1);
         lambdasOut[2] = vec3(lambdas, 1);
