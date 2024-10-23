@@ -52,8 +52,8 @@ void main() {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
         vec4 projection = camera.proj * screen;
-        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
-        vec2 screen2D = projection.xy;
+        gl_MeshVerticesEXT[x].gl_Position = projection;
+        vec2 screen2D = projection.xy / projection.w;
         if(currentX > screen2D.x) {
             mostLeft = x;
             currentX = screen2D.x;
@@ -100,9 +100,9 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
         //vec3 lambdasFin = vec3(otherDist, 1.0f - lambdas.y - lambdas.x);
-        lambdasOut[0] = vec3(screenSpace[mostLeft], lambdas.x);
-        lambdasOut[1] = vec3(screenSpace[mostRight], lambdas.y);
-        lambdasOut[2] = vec3(screenSpace[mostDistantOne], 1.0f - lambdas.y - lambdas.x);
+        lambdasOut[0] = vec3(lambdas, 1);
+        lambdasOut[1] = vec3(lambdas, 1);
+        lambdasOut[2] = vec3(lambdas, 1);
         SetMeshOutputsEXT(4, 3);
     }
 }
