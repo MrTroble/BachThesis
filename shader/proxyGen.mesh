@@ -11,7 +11,10 @@ layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
 // Debug Out
-layout(location=0) perprimitiveEXT flat out vec3 lambdasOut[];
+layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
+// Depth output
+layout(location=0) out float depthsMin[];
+layout(location=1) out float depthsMax[];
 
 layout (binding=0) uniform Camera {
     mat4 model;
@@ -33,7 +36,6 @@ bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
     return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
 }
 
-
 float aboveLine(vec2 l1, vec2 l2, vec2 p) {
     vec2 Md = l2 - l1;
     vec2 n = vec2(Md.y, -Md.x);
@@ -49,6 +51,7 @@ void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
     
+    vec2 projectionDepths[4];
     vec2 screenSpace[4];
     uint mostLeft = 0;
     float currentX = FLT_MAX;
@@ -61,6 +64,7 @@ void main() {
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
         vec2 screen2D = projection.xy / projection.w;
+        projectionDepths[x] = projection.zw;
         if(!allNot && !(screen2D.x < -1 || screen.x > 1 || screen2D.y < -1 || screen.y > 1))
             allNot = true;
         if(currentX > screen2D.x) {
@@ -103,7 +107,8 @@ void main() {
     float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
     // Multiply inverse
     vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
-    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || 0.0f >= 1.0f - lambdas.y - lambdas.x) {
+    float lambda2 = 1.0f - lambdas.y - lambdas.x;
+    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambda2 <= 0.0f ) {
         // Case 2
         
         float p2Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], P2);
@@ -140,6 +145,7 @@ void main() {
         
         float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
         vec2 midpoint = P1 + dP31 * s;
+        float t = dot(dP20, midpoint - screenSpace[lineTwo.y]) / dot(dP20, dP20);
 
         gl_MeshVerticesEXT[4].gl_Position = vec4(midpoint, 0.0f, 1.0f);
 
@@ -152,12 +158,47 @@ void main() {
         lambdasOut[1] = vec3(lineOne, sign(p2Dist));
         lambdasOut[2] = vec3(lineTwo, sign(p3Dist));
         lambdasOut[3] = vec3(screenSpace[lineTwo.x], 1);
+
+        for(uint x = 0; x < 4; x++) {
+            uint id = triangleOuter[x];
+            vec2 vz = projectionDepths[id];
+            float z = vz.x / vz.y;
+            depthsMin[id] = z;
+            depthsMax[id] = z;
+        }
+        vec2 va = projectionDepths[lineOne.x];
+        vec2 vc = projectionDepths[lineOne.y];
+        vec2 vb = projectionDepths[lineTwo.x];
+        vec2 vd = projectionDepths[lineTwo.y];
+        float oneZ0 = 1.0f / (va.y / va.x * t + vc.y / vc.x * t);
+        float oneZ1 = 1.0f / (vb.y / vb.x * t + vd.y / vd.x * t);
+
+        depthsMin[4] = min(oneZ0, oneZ1);
+        depthsMax[4] = max(oneZ0, oneZ1);
+
         SetMeshOutputsEXT(5, 4);
     } else {
+        float[] lambdaArray = {lambdas.x, lambdas.y, lambda2};
+        float z1 = 0;
+        for(uint x = 0; x < 3; x++) {
+            uint id = triangleOuter[x];
+            vec2 vz = projectionDepths[id];
+            float z = vz.x / vz.y;
+            depthsMin[id] = z;
+            depthsMax[id] = z;
+            z1 += (vz.y / vz.x) * lambdaArray[x];
+        }
+        vec2 vz = projectionDepths[otherDist];
+        float z0 = vz.x / vz.y;
+        float oneZ1 = 1.0f / z1;
+        depthsMin[otherDist] = min(z0, oneZ1);
+        depthsMax[otherDist] = max(z0, oneZ1);
+
         // Case 1
         gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], otherDist);
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
+        
         lambdasOut[0] = vec3(lambdas, 1);
         lambdasOut[1] = vec3(lambdas, 1);
         lambdasOut[2] = vec3(lambdas, 1);
