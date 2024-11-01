@@ -11,7 +11,7 @@ layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
 // Debug Out
-layout(location=0) perprimitiveEXT out vec3 lambdasOut[];
+layout(location=0) perprimitiveEXT flat out vec3 lambdasOut[];
 
 layout (binding=0) uniform Camera {
     mat4 model;
@@ -105,10 +105,6 @@ void main() {
     vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
     if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || 0.0f >= 1.0f - lambdas.y - lambdas.x) {
         // Case 2
-        gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 4);
-        gl_PrimitiveTriangleIndicesEXT[1] = uvec3(1, 2, 4);
-        gl_PrimitiveTriangleIndicesEXT[2] = uvec3(2, 3, 4);
-        gl_PrimitiveTriangleIndicesEXT[3] = uvec3(3, 0, 4);
         
         float p2Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], P2);
         float p3Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], screenSpace[otherDist]);
@@ -125,8 +121,8 @@ void main() {
             // Case: We need to find the bisection point
             vec2 baseline = normalize(screenSpace[mostRight] - screenSpace[mostLeft]);
             
-            float w1 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[otherDist]));
-            float w2 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[mostDistantOne]));
+            float w1 = sign(p2Dist) * dot(baseline, normalize(screenSpace[mostRight] - screenSpace[otherDist]));
+            float w2 = sign(p2Dist) * dot(baseline, normalize(screenSpace[mostRight] - screenSpace[mostDistantOne]));
             lineOne.x = mostLeft;
             lineOne.y = otherDist;
             lineTwo.x = mostRight;
@@ -144,12 +140,18 @@ void main() {
         
         float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
         vec2 midpoint = P1 + dP31 * s;
-        gl_MeshVerticesEXT[4].gl_Position = vec4(P2, 0, 1);
 
-        lambdasOut[0] = vec3(midpoint, 1);
-        lambdasOut[1] = vec3(lambdas, 1);
-        lambdasOut[2] = vec3(lambdas, 1);
-        lambdasOut[3] = vec3(lambdas, 1);
+        gl_MeshVerticesEXT[4].gl_Position = vec4(midpoint, 0.0f, 1.0f);
+
+        gl_PrimitiveTriangleIndicesEXT[0] = uvec3(lineOne.y, lineTwo.y, 4);
+        gl_PrimitiveTriangleIndicesEXT[1] = uvec3(lineOne.y, lineTwo.x, 4);
+        gl_PrimitiveTriangleIndicesEXT[2] = uvec3(lineOne.x, lineTwo.y, 4);
+        gl_PrimitiveTriangleIndicesEXT[3] = uvec3(lineOne.x, lineTwo.x, 4);
+
+        lambdasOut[0] = vec3(midpoint, s);
+        lambdasOut[1] = vec3(lineOne, sign(p2Dist));
+        lambdasOut[2] = vec3(lineTwo, sign(p3Dist));
+        lambdasOut[3] = vec3(screenSpace[lineTwo.x], 1);
         SetMeshOutputsEXT(5, 4);
     } else {
         // Case 1
