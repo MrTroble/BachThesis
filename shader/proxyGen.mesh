@@ -121,15 +121,15 @@ void main() {
             // Case: We need to find the bisection point
             vec2 baseline = normalize(screenSpace[mostRight] - screenSpace[mostLeft]);
             
-            float w1 = sign(p2Dist) * dot(baseline, normalize(screenSpace[mostRight] - screenSpace[otherDist]));
-            float w2 = sign(p2Dist) * dot(baseline, normalize(screenSpace[mostRight] - screenSpace[mostDistantOne]));
+            float w1 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[otherDist]));
+            float w2 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[mostDistantOne]));
             lineOne.x = mostLeft;
-            lineOne.y = otherDist;
+            lineOne.y = mostDistantOne;
             lineTwo.x = mostRight;
-            lineTwo.y = mostDistantOne;
+            lineTwo.y = otherDist;
             if(w1 < w2) {
-                lineOne.y = mostDistantOne;
-                lineTwo.y = otherDist;
+                lineOne.y = otherDist;
+                lineTwo.y = mostDistantOne;
             }
         }
 
