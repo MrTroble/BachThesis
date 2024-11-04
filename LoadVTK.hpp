@@ -28,6 +28,7 @@ struct VTKFile {
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
+    if(!valueVTK) throw std::runtime_error("Could not find file!");
     std::string value;
 
     std::vector<glm::vec4> vertices;

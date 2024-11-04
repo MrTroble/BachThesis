@@ -43,6 +43,7 @@ message(${Vulkan_GLSLC_EXECUTABLE})
 add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh" "vertexWire.vert" "proxyGen.mesh" "debug.frag"
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
 file(COPY "shader" DESTINATION "./")
+file(COPY "assets" DESTINATION "./")
 
 add_executable(BachThesis "BachThesis.cpp")
 target_link_libraries(BachThesis PUBLIC imgui_lib)
