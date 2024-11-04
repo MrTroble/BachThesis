@@ -207,6 +207,7 @@ inline void recreatePipeline(IContext& context) {
         createWirelessCreateInfo.setStages(proxyPipelineShaderStages);
         rasterizationState.polygonMode = vk::PolygonMode::eFill;
         colorBlends[0].dstColorBlendFactor = vk::BlendFactor::eOne;
+        colorBlends[0].colorBlendOp = vk::BlendOp::eReverseSubtract;
         const auto result2 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
         if (result2.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");

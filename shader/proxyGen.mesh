@@ -170,8 +170,8 @@ void main() {
         vec2 vc = projectionDepths[lineOne.y];
         vec2 vb = projectionDepths[lineTwo.x];
         vec2 vd = projectionDepths[lineTwo.y];
-        float oneZ0 = 1.0f / (va.y / va.x * t + vc.y / vc.x * t);
-        float oneZ1 = 1.0f / (vb.y / vb.x * t + vd.y / vd.x * t);
+        float oneZ0 = 1.0f / (va.y / va.x * (1 - t) + vc.y / vc.x * t);
+        float oneZ1 = 1.0f / (vb.y / vb.x * (1 - s) + vd.y / vd.x * s);
 
         depthsMin[4] = min(oneZ0, oneZ1);
         depthsMax[4] = max(oneZ0, oneZ1);
