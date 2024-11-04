@@ -160,11 +160,10 @@ void main() {
         lambdasOut[3] = vec3(screenSpace[lineTwo.x], 1);
 
         for(uint x = 0; x < 4; x++) {
-            uint id = triangleOuter[x];
-            vec2 vz = projectionDepths[id];
+            vec2 vz = projectionDepths[x];
             float z = vz.x / vz.y;
-            depthsMin[id] = z;
-            depthsMax[id] = z;
+            depthsMin[x] = z;
+            depthsMax[x] = z;
         }
         vec2 va = projectionDepths[lineOne.x];
         vec2 vc = projectionDepths[lineOne.y];
