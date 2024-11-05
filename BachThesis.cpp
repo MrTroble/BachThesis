@@ -189,7 +189,7 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    std::vector vtkFiles = { loadVTK("assets/crystal.vtk", icontext) };
+    std::vector vtkFiles = { loadVTK("assets/perf.vtk", icontext) };
     const ScopeExit cleanCrystal([&]() { for (auto& file : vtkFiles) file.unload(icontext); });
 
     while (!glfwWindowShouldClose(icontext.window))

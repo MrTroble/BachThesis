@@ -34,7 +34,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::vector<glm::vec4> vertices;
     std::vector<Tetrahedron> tetrahedrons;
 
-    while (valueVTK)
+    while (!valueVTK.eof() && valueVTK)
     {
         valueVTK >> value;
         if (value == "v") {
