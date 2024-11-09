@@ -254,7 +254,7 @@ inline void createShaderPipelines(IContext& context) {
     recreatePipeline(context);
 
     const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 100);
-    const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1, poolSize);
+    const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1000, poolSize);
     context.descriptorPool = context.device.createDescriptorPool(descriptorPoolCreateInfo);
 }
 

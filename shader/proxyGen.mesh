@@ -108,7 +108,7 @@ void main() {
     // Multiply inverse
     vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
     float lambda2 = 1.0f - lambdas.y - lambdas.x;
-    if(false && (lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambda2 <= 0.0f)) {
+    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambda2 <= 0.0f) {
         // Case 2
         float p2Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], P2);
         float p3Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], screenSpace[otherDist]);

@@ -189,8 +189,16 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    std::vector vtkFiles = { loadVTK("assets/perf.vtk", icontext) };
-    const ScopeExit cleanCrystal([&]() { for (auto& file : vtkFiles) file.unload(icontext); });
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk"};
+    std::vector<VTKFile> loadedVtkFiles = { };
+    for (const auto& value : vtkNames) {
+        loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));
+    }
+    std::vector<VTKFile> vtkFiles = { loadedVtkFiles[0] };
+    std::vector<char> active;
+    active.resize(loadedVtkFiles.size(), false);
+    active[0] = true;
+    const ScopeExit cleanCrystal([&]() { for (auto& file : loadedVtkFiles) file.unload(icontext); });
 
     while (!glfwWindowShouldClose(icontext.window))
     {
@@ -231,6 +239,19 @@ int main()
                     if (isSelected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            if (ImGui::CollapsingHeader("Models")) {
+                for (size_t i = 0; i < vtkNames.size(); i++)
+                {
+                    if(ImGui::Checkbox(vtkNames[i], (bool*)&active[i])) {
+                        vtkFiles.clear();
+                        for (size_t i = 0; i < vtkNames.size(); i++) {
+                            if (active[i]) {
+                                vtkFiles.push_back(loadedVtkFiles[i]);
+                            }
+                        }
+                    }
+                }
             }
             if (ImGui::CollapsingHeader("Camera")) {
                 ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
