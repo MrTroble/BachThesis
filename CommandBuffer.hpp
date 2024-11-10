@@ -201,7 +201,7 @@ inline void recreatePipeline(IContext& context) {
     createWirelessCreateInfo.renderPass = context.renderPass;
     if (context.meshShader) {
         const auto result = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
-        if(result.result != vk::Result::eSuccess)
+        if (result.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.wireframePipeline = result.value;
         createWirelessCreateInfo.setStages(proxyPipelineShaderStages);
@@ -281,7 +281,10 @@ inline void updateCamera(IContext& context) {
     auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
     projectionMatrix[1][1] *= -1;
     cameraMap->proj = projectionMatrix;
-    cameraMap->view = glm::lookAt(context.position, context.lookAtPosition, glm::vec3{ 0.0f, 1.0f, 0.0f });
+    glm::vec3 lookAt = glm::vec3(glm::rotate(glm::identity<glm::mat4>(), context.lookAtPosition.x, glm::vec3{ 0, 1, 0 }) * glm::vec4{ 1, 0, 0, 1 });
+    lookAt = glm::rotate(glm::identity<glm::mat4>(), context.lookAtPosition.y, glm::vec3{ 0, 0, 1 }) * glm::vec4(lookAt, 1);
+    lookAt = glm::normalize(lookAt) * context.lookAtPosition.z;
+    cameraMap->view = glm::lookAt(context.position + lookAt, context.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
     cameraMap->model = glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
     context.device.unmapMemory(context.cameraStagingMemory);
 
