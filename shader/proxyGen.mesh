@@ -20,6 +20,7 @@ layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;
     mat4 proj;
+    float depth;
 } camera;
 layout (binding=1) buffer Index {
     uvec4 data[];
@@ -64,7 +65,7 @@ void main() {
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
         vec2 screen2D = projection.xy / projection.w;
-        projectionDepths[x] = projection.zw;
+        projectionDepths[x] = screen.zw;
         if(!allNot && !(screen2D.x < -1 || screen.x > 1 || screen2D.y < -1 || screen.y > 1))
             allNot = true;
         if(currentX > screen2D.x) {
