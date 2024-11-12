@@ -257,8 +257,19 @@ int main()
                 ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
                 ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
                 ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
-                ImGui::SliderFloat2("Rotation", &icontext.lookAtPosition.x, 0, 3.0f);
-                ImGui::SliderFloat("Zoom", &icontext.lookAtPosition.z, 0, 2.0f);
+                ImGui::SliderFloat2("Rotation", &icontext.lookAtPosition.x, -3.0f, 3.0f);
+                ImGui::SliderFloat("Zoom", &icontext.lookAtPosition.z, 0, 10.0f);
+                ImGui::SliderFloat("Depth Factor", &icontext.depth, 0, 10.0f);
+                if (ImGui::Button("Centre")) {
+                    AABB aabb;
+                    for (size_t i = 0; i < vtkNames.size(); i++) {
+                        if (active[i]) {
+                            aabb = extendAABB(aabb, loadedVtkFiles[i].aabb);
+                        }
+                    }
+                    const auto middle = (aabb.max + aabb.min) * 0.05f;
+                    icontext.position = middle;
+                }
             }
         }
         ImGui::End();

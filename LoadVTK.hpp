@@ -12,12 +12,22 @@ struct Tetrahedron {
 };
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 
+struct AABB {
+    glm::vec3 min{ 0.0f };
+    glm::vec3 max{ 0.0f };
+};
+
+inline AABB extendAABB(const AABB& aabb1, const AABB& aabb2) {
+    return { glm::min(aabb1.min, aabb2.min), glm::max(aabb1.max, aabb2.max) };
+}
+
 struct VTKFile {
     size_t amountOfTetrahedrons;
     vk::DeviceMemory memory;
     vk::Buffer vertexBuffer;
     vk::Buffer indexBuffer;
     vk::DescriptorSet descriptor;
+    AABB aabb;
 
     void unload(IContext& context) {
         context.device.freeMemory(memory);
@@ -28,12 +38,13 @@ struct VTKFile {
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
-    if(!valueVTK) throw std::runtime_error("Could not find file!");
+    if (!valueVTK) throw std::runtime_error("Could not find file!");
     std::string value;
 
     std::vector<glm::vec4> vertices;
     std::vector<Tetrahedron> tetrahedrons;
 
+    AABB aabb;
     while (!valueVTK.eof() && valueVTK)
     {
         valueVTK >> value;
@@ -42,6 +53,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             valueVTK >> vertex.x >> vertex.y >> vertex.z;
             vertex.w = 1.0f;
             vertices.push_back(vertex);
+            aabb.max = glm::max(aabb.max, glm::vec3(vertex));
+            aabb.min = glm::max(aabb.min, glm::vec3(vertex));
         }
         else if (value == "t") {
             Tetrahedron tetrahedron;
@@ -111,7 +124,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::array writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets };
     context.device.updateDescriptorSets(writeUpdateInfos, {});
 
-    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, descriptor[0]};
+    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, descriptor[0], aabb };
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     if (result != vk::Result::eSuccess)
         throw std::runtime_error("Vulkan Error");

@@ -232,7 +232,8 @@ inline void recreatePipeline(IContext& context) {
 inline void createShaderPipelines(IContext& context) {
     loadAndAdd(context);
 
-    const vk::ShaderStageFlagBits flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+    vk::ShaderStageFlags flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+    flagBitsForBindings |= vk::ShaderStageFlagBits::eFragment;
 
     const std::array bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -273,6 +274,7 @@ struct CameraInfo {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+    float depth;
 };
 
 inline void updateCamera(IContext& context) {
@@ -286,6 +288,7 @@ inline void updateCamera(IContext& context) {
     lookAt = glm::normalize(lookAt) * context.lookAtPosition.z;
     cameraMap->view = glm::lookAt(context.position + lookAt, context.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
     cameraMap->model = glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
+    cameraMap->depth = context.depth;
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
