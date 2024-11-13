@@ -163,10 +163,10 @@ void main() {
             }
         }
 
-        vec2 P1 = screenSpace[lineOne.y];
-        vec2 dP31 = screenSpace[lineOne.x] - P1;
-        vec2 dP20 = screenSpace[lineTwo.x] - screenSpace[lineTwo.y];
-        vec2 dP01 = screenSpace[lineTwo.y] - P1;
+        vec2 P1 = screenSpace[lineOne.x];
+        vec2 dP31 = screenSpace[lineOne.y] - P1;
+        vec2 dP20 = screenSpace[lineTwo.y] - screenSpace[lineTwo.x];
+        vec2 dP01 = screenSpace[lineTwo.x] - P1;
         
         float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
         vec2 midpoint = P1 + dP31 * s;
@@ -189,8 +189,8 @@ void main() {
         vec2 vc = projectionDepths[lineOne.y];
         vec2 vb = projectionDepths[lineTwo.x];
         vec2 vd = projectionDepths[lineTwo.y];
-        float oneZ0 = 1.0f / ((va.y / va.x) * (1.0f - t) + (vc.y / vc.x) * t);
-        float oneZ1 = 1.0f / ((vb.y / vb.x) * (1.0f - s) + (vd.y / vd.x) * s);
+        float oneZ0 = 1.0f / ((va.y / va.x) * (1.0f - s) + (vc.y / vc.x) * s);
+        float oneZ1 = 1.0f / ((vb.y / vb.x) * (1.0f - t) + (vd.y / vd.x) * t);
 
         lambdasOut[0] = vec3((1.0f - t), t, 0);
         lambdasOut[1] = vec3((1.0f - s), s, 0);
