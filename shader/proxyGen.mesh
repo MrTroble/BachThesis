@@ -48,6 +48,11 @@ float distToLine(vec2 l1, vec2 l2, vec2 p) {
     return abs(aboveLine(l1, l2, p));
 }
 
+void debugExit(uint code) {
+    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, code);
+    SetMeshOutputsEXT(3, 1);
+}
+
 void main() {
     const uint i = gl_WorkGroupID.x;
     const uvec4 tetrahedron = index.data[i + push.offset];
@@ -65,8 +70,9 @@ void main() {
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
         vec2 screen2D = projection.xy / projection.w;
+        screenSpace[x] = screen2D;
         projectionDepths[x] = screen.zw;
-        if(!allNot && !(screen2D.x < -1 || screen.x > 1 || screen2D.y < -1 || screen.y > 1))
+        if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
             allNot = true;
         if(currentX > screen2D.x) {
             mostLeft = x;
@@ -76,14 +82,27 @@ void main() {
             mostRight = x;
             currentXRight = screen2D.x;
         }
-        screenSpace[x] = screen2D;
     }
+
+//  ===> DEBUG
+//    if(currentX == FLT_MAX) {
+//        debugExit(0);
+//        return;
+//    }
+//    if(currentXRight == -FLT_MAX) {
+//        debugExit(0);
+//        return;
+//    }
+//  END ===> DEBUG
+
     // Clipping
-    if(!allNot)
+    if(!allNot) {
+        SetMeshOutputsEXT(0, 0);
         return;
+    }
     
     float distanceToLine = 0;
-    uint mostDistantOne = 0;
+    uint mostDistantOne = 4;
     uint otherDist = 4;
     for(uint x = 0; x < 4; x++) {
         if(mostRight == x || mostLeft == x) {
@@ -99,6 +118,12 @@ void main() {
             otherDist = x;
         }
     }
+//  ===> DEBUG
+//    if(mostDistantOne == 4 || otherDist == 4) {
+//        debugExit(1);
+//        return;
+//    }
+//  END ===> DEBUG
     uint triangleOuter[3] = { mostLeft, mostRight, mostDistantOne };
 
     vec2 P2 = screenSpace[mostDistantOne];
