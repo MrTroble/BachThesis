@@ -164,13 +164,14 @@ void main() {
         }
 
         vec2 P1 = screenSpace[lineOne.x];
+        vec2 P0 = screenSpace[lineTwo.x];
         vec2 dP31 = screenSpace[lineOne.y] - P1;
-        vec2 dP20 = screenSpace[lineTwo.y] - screenSpace[lineTwo.x];
-        vec2 dP01 = screenSpace[lineTwo.x] - P1;
+        vec2 dP20 = screenSpace[lineTwo.y] - P0;
+        vec2 dP01 = P0 - P1;
         
         float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
         vec2 midpoint = P1 + dP31 * s;
-        float t = dot(dP20, midpoint - screenSpace[lineTwo.y]) / dot(dP20, dP20);
+        float t = dot(dP20, midpoint - P0) / dot(dP20, dP20);
 
         gl_MeshVerticesEXT[4].gl_Position = vec4(midpoint, 0.0f, 1.0f);
 
