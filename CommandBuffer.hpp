@@ -60,22 +60,14 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
-    const vk::ClearValue clearColor(vk::ClearColorValue{ 1.0f, 1.0f, 1.0f, 1.0f });
+    const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };
+    const vk::ClearColorValue blackValue{ 0.0f, 0.0f, 0.0f, 1.0f };
+    const vk::ClearValue clearColor(context.type == PipelineType::ProxyABuffer ? blackValue:whiteValue);
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
 
-    const vk::Pipeline currentPipeline = ([&]() {
-        switch (context.type)
-        {
-        case PipelineType::Wireframe:
-            return context.wireframePipeline;
-        case PipelineType::Proxy:
-            return context.proxyPipeline;
-        default:
-            throw std::runtime_error("Pipeline type not found");
-        }
-        })();
+    const vk::Pipeline currentPipeline = getFromType(context.type, context);
     currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline);
 
     for (const auto& vtk : vtkFiles)
@@ -163,11 +155,11 @@ inline void loadAndAdd(IContext& context) {
 }
 
 inline void recreatePipeline(IContext& context) {
-    if (context.wireframePipeline) {
-        context.device.destroy(context.wireframePipeline);
-    }
-    if (context.proxyPipeline) {
-        context.device.destroy(context.proxyPipeline);
+    for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
+    {
+        const auto pipe = getFromType((PipelineType)i, context);
+        if(pipe)
+            context.device.destroy(pipe);
     }
 
     std::array pipelineShaderStages = {
@@ -212,6 +204,11 @@ inline void recreatePipeline(IContext& context) {
         if (result2.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.proxyPipeline = result2.value;
+        colorBlends[0].colorBlendOp = vk::BlendOp::eAdd;
+        const auto result3 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        if (result3.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
+        context.proxyABuffer = result3.value;
     }
     else {
         std::array noneMeshShaderStages = {
@@ -266,8 +263,12 @@ inline void destroyShaderPipelines(IContext& context) {
     context.device.destroy(context.descriptorPool);
     context.device.destroy(context.defaultDescriptorSetLayout);
     context.device.destroy(context.defaultPipelineLayout);
-    context.device.destroy(context.wireframePipeline);
-    context.device.destroy(context.proxyPipeline);
+    for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
+    {
+        const auto pipe = getFromType((PipelineType)i, context);
+        if (pipe)
+            context.device.destroy(pipe);
+    }
 }
 
 struct CameraInfo {

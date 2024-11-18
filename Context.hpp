@@ -26,9 +26,9 @@ struct CommandBufferContext {
 };
 
 enum class PipelineType {
-    Wireframe, Proxy
+    Wireframe, Proxy, ProxyABuffer
 };
-constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::Proxy + 1;
+constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::ProxyABuffer + 1;
 
 namespace std {
     inline std::string to_string(PipelineType type) {
@@ -38,6 +38,8 @@ namespace std {
             return "Wireframe";
         case PipelineType::Proxy:
             return "Proxy";
+        case PipelineType::ProxyABuffer:
+            return "Proxy with ABuffer";
         default:
             throw std::runtime_error("Pipeline type not found");
         }
@@ -74,6 +76,7 @@ struct IContext {
     vk::DescriptorPool descriptorPool;    
     vk::Pipeline wireframePipeline;
     vk::Pipeline proxyPipeline;
+    vk::Pipeline proxyABuffer;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;
@@ -106,3 +109,18 @@ struct IContext {
     }
 
 };
+
+inline vk::Pipeline getFromType(PipelineType type, const IContext& context) {
+    switch (type)
+    {
+    case PipelineType::Wireframe:
+        return context.wireframePipeline;
+    case PipelineType::Proxy:
+        return context.proxyPipeline;
+    case PipelineType::ProxyABuffer:
+        return context.proxyABuffer;
+    default:
+        throw std::runtime_error("Pipeline type not found");
+    }
+}
+
