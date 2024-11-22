@@ -20,13 +20,8 @@ layout (binding=2) buffer Vertex {
     vec4 vertexData[];
 } vertex;
 
-layout(push_constant) uniform PushConsts {
-    uint offset;
-} push;
-
 void main() {
-    const uint i = gl_WorkGroupID.x;
-    const uvec4 tetrahedron = index.data[i + push.offset];
+    const uvec4 tetrahedron = index.data[gl_WorkGroupID.x];
     gl_PrimitiveLineIndicesEXT[0] = uvec2(0, 1);
     gl_PrimitiveLineIndicesEXT[1] = uvec2(0, 2);
     gl_PrimitiveLineIndicesEXT[2] = uvec2(0, 3);

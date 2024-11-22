@@ -189,7 +189,7 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk"};
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk" };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
         loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));

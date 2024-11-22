@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 #include "Context.hpp"
 
-constexpr uint32_t MAX_WORK_GROUPS = 128;
+constexpr uint32_t MAX_WORK_GROUPS = 256;
 
 struct Tetrahedron {
     uint32_t p1, p2, p3, p4;

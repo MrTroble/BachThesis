@@ -2,8 +2,7 @@
 
 #extension GL_EXT_mesh_shader : require
 
-layout(location=0) in float depthsMin;
-layout(location=1) in float depthsMax;
+layout(location=0) in vec4 depthsMinMax;
 
 layout(location=2) perprimitiveEXT in vec3 lambdas;
 
@@ -17,10 +16,13 @@ layout (binding=0) uniform Camera {
 } camera;
 
 void main() {
-    float depth = (depthsMax - depthsMin);
-    if(depth < 0.0f) {
-        colorOut = vec4(1.0f, 0.0f, 0.0f, abs(depth));
-        return;
-    }
+    mat4 matInverse = inverse(camera.proj * camera.view);
+
+    vec4 minValue = matInverse * vec4(depthsMinMax.xy, depthsMinMax.z, 1.0f);    
+    vec4 maxValue = matInverse * vec4(depthsMinMax.xy, depthsMinMax.w, 1.0f);
+    minValue /= minValue.w;
+    maxValue /= maxValue.w;
+
+    float depth = length(maxValue - minValue);
     colorOut = vec4(vec3(1.0f, 1.0f, 1.0f) * depth * camera.depth, 1.0f);
 }

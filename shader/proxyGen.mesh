@@ -13,8 +13,7 @@ layout (max_vertices=5, max_primitives=4) out;
 // Debug Out
 layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
 // Depth output
-layout(location=0) out float depthsMin[];
-layout(location=1) out float depthsMax[];
+layout(location=0) out vec4 depthsMinMax[];
 
 layout (binding=0) uniform Camera {
     mat4 model;
@@ -28,10 +27,6 @@ layout (binding=1) buffer Index {
 layout (binding=2) buffer Vertex {
     vec4 vertexData[];
 } vertex;
-
-layout(push_constant) uniform PushConsts {
-    uint offset;
-} push;
 
 bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
     return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
@@ -54,10 +49,9 @@ void debugExit(uint code) {
 }
 
 void main() {
-    const uint i = gl_WorkGroupID.x;
-    const uvec4 tetrahedron = index.data[i + push.offset];
+    const uvec4 tetrahedron = index.data[gl_WorkGroupID.x];
     
-    vec2 projectionDepths[4];
+    vec4 projectionDepths[4];
     vec2 screenSpace[4];
     uint mostLeft = 0;
     float currentX = FLT_MAX;
@@ -68,10 +62,10 @@ void main() {
         vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
         vec4 screen = camera.view * world;
         vec4 projection = camera.proj * screen;
-        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0, projection.w);
         vec2 screen2D = projection.xy / projection.w;
+        gl_MeshVerticesEXT[x].gl_Position = vec4(screen2D, 0.0f, 1.0f);
         screenSpace[x] = screen2D;
-        projectionDepths[x] = screen.zw;
+        projectionDepths[x] = projection / projection.w;
         if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
             allNot = true;
         if(currentX > screen2D.x) {
@@ -96,10 +90,10 @@ void main() {
 //  END ===> DEBUG
 
     // Clipping
-    if(!allNot) {
-        SetMeshOutputsEXT(0, 0);
-        return;
-    }
+    //if(!allNot) {
+    //    SetMeshOutputsEXT(0, 0);
+    //    return;
+    //}
     
     float distanceToLine = 0;
     uint mostDistantOne = 4;
@@ -181,25 +175,23 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[3] = uvec3(lineOne.x, lineTwo.x, 4);
 
         for(uint x = 0; x < 4; x++) {
-            vec2 vz = projectionDepths[x];
-            float z = vz.x / vz.y;
-            depthsMin[x] = z;
-            depthsMax[x] = z;
+            vec4 vz = projectionDepths[x];
+            float z = vz.z / vz.w;
+            depthsMinMax[x] = vec4(vz.xy / vz.w, z, z);
         }
-        vec2 va = projectionDepths[lineOne.x];
-        vec2 vc = projectionDepths[lineOne.y];
-        vec2 vb = projectionDepths[lineTwo.x];
-        vec2 vd = projectionDepths[lineTwo.y];
-        float oneZ0 = 1.0f / ((va.y / va.x) * (1.0f - s) + (vc.y / vc.x) * s);
-        float oneZ1 = 1.0f / ((vb.y / vb.x) * (1.0f - t) + (vd.y / vd.x) * t);
+        vec4 va = projectionDepths[lineOne.x];
+        vec4 vc = projectionDepths[lineOne.y];
+        vec4 vb = projectionDepths[lineTwo.x];
+        vec4 vd = projectionDepths[lineTwo.y];
+        float oneZ0 = 1.0f / ((1.0f - s) / va.z + s / vc.z);
+        float oneZ1 = 1.0f / ((1.0f - t) / vb.z + t / vd.z);
 
         lambdasOut[0] = vec3((1.0f - t), t, 0);
         lambdasOut[1] = vec3((1.0f - s), s, 0);
         lambdasOut[2] = vec3(0, 0, 0);
         lambdasOut[3] = vec3(0, 0, 0);
 
-        depthsMin[4] = min(oneZ0, oneZ1);
-        depthsMax[4] = max(oneZ0, oneZ1);
+        depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
         SetMeshOutputsEXT(5, 4);
     } else {
@@ -207,17 +199,14 @@ void main() {
         float z1 = 0;
         for(uint x = 0; x < 3; x++) {
             uint id = triangleOuter[x];
-            vec2 vz = projectionDepths[id];
-            float z = vz.x / vz.y;
-            depthsMin[id] = z;
-            depthsMax[id] = z;
-            z1 += (vz.y / vz.x) * lambdaArray[x];
+            vec4 vz = projectionDepths[id];
+            depthsMinMax[id] = vec4(vz.xy, vz.z, vz.z);
+            z1 += lambdaArray[x] / vz.z;
         }
-        vec2 vz = projectionDepths[otherDist];
-        float z0 = vz.x / vz.y;
+        vec4 vz = projectionDepths[otherDist];
+        float z0 = vz.z;
         float oneZ1 = 1.0f / z1;
-        depthsMin[otherDist] = min(z0, oneZ1);
-        depthsMax[otherDist] = max(z0, oneZ1);
+        depthsMinMax[otherDist] = vec4(vz.xy, min(z0, oneZ1), max(z0, oneZ1));
 
         // Case 1
         gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], otherDist);

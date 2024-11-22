@@ -10,10 +10,6 @@ layout (binding=2) buffer Vertex {
     readonly vec4 vertexData[];
 } vertex;
 
-layout(push_constant) uniform PushConsts {
-    uint offset;
-} push;
-
 void main() {
     const uint tetraID = gl_VertexIndex / 12;
     const uvec4 tetrahedron = index.data[tetraID];

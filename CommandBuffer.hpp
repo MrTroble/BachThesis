@@ -37,17 +37,7 @@ inline void destroyPrimaryCommandBufferContext(IContext& context) {
 inline void recordMeshPipeline(const VTKFile& vtk, vk::CommandBuffer currentBuffer, IContext& context) {
     const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
     const size_t lastGroupAmount = vtk.amountOfTetrahedrons - workGroups * MAX_WORK_GROUPS;
-    for (size_t i = 0; i < workGroups; i++)
-    {
-        const uint32_t currentOffset = i * MAX_WORK_GROUPS;
-        currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
-        currentBuffer.drawMeshTasksEXT(MAX_WORK_GROUPS, 1, 1, context.dynamicLoader);
-    }
-    if (lastGroupAmount > 0) {
-        const uint32_t currentOffset = workGroups * MAX_WORK_GROUPS;
-        currentBuffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eMeshEXT, 0, sizeof(uint32_t), &currentOffset);
-        currentBuffer.drawMeshTasksEXT(lastGroupAmount, 1, 1, context.dynamicLoader);
-    }
+    currentBuffer.drawMeshTasksEXT(vtk.amountOfTetrahedrons, 1, 1, context.dynamicLoader);
 }
 
 inline void recordVertexPipeline(const VTKFile& vtk, vk::CommandBuffer currentBuffer, IContext& context) {
@@ -62,7 +52,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     currentBuffer.begin(beginInfo);
     const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };
     const vk::ClearColorValue blackValue{ 0.0f, 0.0f, 0.0f, 1.0f };
-    const vk::ClearValue clearColor(context.type == PipelineType::ProxyABuffer ? blackValue:whiteValue);
+    const vk::ClearValue clearColor(context.type == PipelineType::ProxyABuffer ? blackValue : whiteValue);
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
@@ -158,7 +148,7 @@ inline void recreatePipeline(IContext& context) {
     for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
     {
         const auto pipe = getFromType((PipelineType)i, context);
-        if(pipe)
+        if (pipe)
             context.device.destroy(pipe);
     }
 
@@ -244,8 +234,7 @@ inline void createShaderPipelines(IContext& context) {
 
     const auto shaderStageFlags = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
-    std::array pushConstantRanges = { vk::PushConstantRange{shaderStageFlags, 0, 2 * sizeof(uint32_t)} };
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConstantRanges);
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
 
