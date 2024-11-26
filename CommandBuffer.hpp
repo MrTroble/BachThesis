@@ -131,7 +131,7 @@ inline void renderPassCreation(IContext& icontext) {
 
 inline void loadAndAdd(IContext& context) {
     std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv" };
-    const std::array meshShader = { "testMesh.spv", "proxyGen.spv" };
+    const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
     }
@@ -154,12 +154,12 @@ inline void recreatePipeline(IContext& context) {
 
     std::array pipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["test.frag.spv"], "main"},
-    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.spv"], "main"}
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["testMesh.mesh.spv"], "main"}
     };
 
     std::array proxyPipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["debug.frag.spv"], "main"},
-    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.spv"], "main"}
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
     };
 
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };

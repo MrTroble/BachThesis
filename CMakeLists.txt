@@ -38,12 +38,16 @@ add_library(imgui_lib "submodules/imgui/imgui.cpp" "submodules/imgui/imgui_demo.
     "submodules/imgui/backends/imgui_impl_vulkan.cpp" "submodules/imgui/backends/imgui_impl_glfw.cpp")
 target_include_directories(imgui_lib PUBLIC "submodules/imgui")
 target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
-
-message(${Vulkan_GLSLC_EXECUTABLE})
-add_custom_target(shaderTarget ALL ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.2 -c "test.frag" "testMesh.mesh" "vertexWire.vert" "proxyGen.mesh" "debug.frag"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
-file(COPY "shader" DESTINATION "./")
 file(COPY "assets" DESTINATION "./")
 
 add_executable(BachThesis "BachThesis.cpp")
 target_link_libraries(BachThesis PUBLIC imgui_lib)
+
+file(GLOB files "shader/*.*")
+foreach(file ${files})
+  cmake_path(GET file FILENAME filename)
+  add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/shader/${filename}.spv" COMMAND ${Vulkan_GLSLC_EXECUTABLE} -O --target-env=vulkan1.2 -c "${file}" -o "${CMAKE_BINARY_DIR}/shader/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shader)
+  list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/shader/${filename}.spv")
+endforeach()
+add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
+add_dependencies(BachThesis shaderTarget)
