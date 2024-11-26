@@ -130,7 +130,7 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv" };
     const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -159,6 +159,11 @@ inline void recreatePipeline(IContext& context) {
 
     std::array proxyPipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["debug.frag.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
+    };
+
+    std::array colorPipelineShaderStages = {
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["color.frag.spv"], "main"},
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
     };
 
@@ -199,6 +204,12 @@ inline void recreatePipeline(IContext& context) {
         if (result3.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.proxyABuffer = result3.value;
+        colorBlends[0].colorBlendOp = vk::BlendOp::eReverseSubtract;
+        createWirelessCreateInfo.setStages(colorPipelineShaderStages);
+        const auto result4 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        if (result4.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
+        context.colorPipeline = result4.value;
     }
     else {
         std::array noneMeshShaderStages = {
@@ -264,7 +275,7 @@ struct CameraInfo {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
-    float depth;
+    glm::vec4 colorADepth;
 };
 
 inline void updateCamera(IContext& context) {
@@ -277,8 +288,8 @@ inline void updateCamera(IContext& context) {
     lookAt = glm::rotate(glm::identity<glm::mat4>(), context.lookAtPosition.y, glm::vec3{ 0, 0, 1 }) * glm::vec4(lookAt, 1);
     lookAt = glm::normalize(lookAt) * context.lookAtPosition.z;
     cameraMap->view = glm::lookAt(context.position + lookAt, context.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
-    cameraMap->model = glm::scale(glm::identity<glm::mat4>(), glm::vec3(0.1f, 0.1f, 0.1f));
-    cameraMap->depth = context.depth;
+    cameraMap->model = glm::identity<glm::mat4>();
+    cameraMap->colorADepth = context.colorADepth;
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

@@ -12,7 +12,7 @@ layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;
     mat4 proj;
-    float depth;
+    vec4 colorDepth;
 } camera;
 
 void main() {
@@ -24,5 +24,5 @@ void main() {
     maxValue /= maxValue.w;
 
     float depth = length(maxValue - minValue);
-    colorOut = vec4(vec3(1.0f, 1.0f, 1.0f) * depth * camera.depth, 1.0f);
+    colorOut = vec4(camera.colorDepth.xyz * depth * camera.colorDepth.w, 1.0f);
 }

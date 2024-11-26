@@ -13,8 +13,8 @@ struct Tetrahedron {
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 
 struct AABB {
-    glm::vec3 min{ 0.0f };
-    glm::vec3 max{ 0.0f };
+    glm::vec3 min{ FLT_MAX };
+    glm::vec3 max{ -FLT_MAX };
 };
 
 inline AABB extendAABB(const AABB& aabb1, const AABB& aabb2) {
@@ -54,7 +54,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             vertex.w = 1.0f;
             vertices.push_back(vertex);
             aabb.max = glm::max(aabb.max, glm::vec3(vertex));
-            aabb.min = glm::max(aabb.min, glm::vec3(vertex));
+            aabb.min = glm::min(aabb.min, glm::vec3(vertex));
         }
         else if (value == "t") {
             Tetrahedron tetrahedron;

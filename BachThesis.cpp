@@ -188,8 +188,7 @@ int main()
         fence = icontext.device.createFence({});
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
-
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk" };
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "Armadillo.vtk"};
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
         loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));
@@ -259,15 +258,16 @@ int main()
                 ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
                 ImGui::SliderFloat2("Rotation", &icontext.lookAtPosition.x, -3.0f, 3.0f);
                 ImGui::SliderFloat("Zoom", &icontext.lookAtPosition.z, 0, 10.0f);
-                ImGui::SliderFloat("Depth Factor", &icontext.depth, 0, 10.0f);
+                ImGui::SliderFloat3("Color Factor", &icontext.colorADepth.x, 0, 1.0f);
+                ImGui::SliderFloat("Depth Factor", &icontext.colorADepth.w, 0, 10.0f);
                 if (ImGui::Button("Centre")) {
-                    AABB aabb;
+                    AABB aabb{};
                     for (size_t i = 0; i < vtkNames.size(); i++) {
                         if (active[i]) {
                             aabb = extendAABB(aabb, loadedVtkFiles[i].aabb);
                         }
                     }
-                    const auto middle = (aabb.max + aabb.min) * 0.05f;
+                    const auto middle = (aabb.max + aabb.min) * 0.5f;
                     icontext.position = middle;
                 }
             }

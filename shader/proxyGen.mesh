@@ -19,7 +19,7 @@ layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;
     mat4 proj;
-    float depth;
+    vec4 colorDepth;
 } camera;
 layout (binding=1) buffer Index {
     uvec4 data[];
@@ -50,6 +50,9 @@ void debugExit(uint code) {
 
 void main() {
     const uvec4 tetrahedron = index.data[gl_WorkGroupID.x];
+    const uint currentClass = gl_WorkGroupID.x % 3;
+    vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
+    primColorOut[currentClass] = 1.0f;
     
     vec4 projectionDepths[4];
     vec2 screenSpace[4];
@@ -90,10 +93,10 @@ void main() {
 //  END ===> DEBUG
 
     // Clipping
-    //if(!allNot) {
-    //    SetMeshOutputsEXT(0, 0);
-    //    return;
-    //}
+    if(!allNot) {
+        SetMeshOutputsEXT(0, 0);
+        return;
+    }
     
     float distanceToLine = 0;
     uint mostDistantOne = 4;
@@ -186,10 +189,10 @@ void main() {
         float oneZ0 = 1.0f / ((1.0f - s) / va.z + s / vc.z);
         float oneZ1 = 1.0f / ((1.0f - t) / vb.z + t / vd.z);
 
-        lambdasOut[0] = vec3((1.0f - t), t, 0);
-        lambdasOut[1] = vec3((1.0f - s), s, 0);
-        lambdasOut[2] = vec3(0, 0, 0);
-        lambdasOut[3] = vec3(0, 0, 0);
+        lambdasOut[0] = primColorOut;
+        lambdasOut[1] = primColorOut;
+        lambdasOut[2] = primColorOut;
+        lambdasOut[3] = primColorOut;
 
         depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
@@ -213,9 +216,9 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
         
-        lambdasOut[0] = vec3(lambdas, 1);
-        lambdasOut[1] = vec3(lambdas, 1);
-        lambdasOut[2] = vec3(lambdas, 1);
+        lambdasOut[0] = primColorOut;
+        lambdasOut[1] = primColorOut;
+        lambdasOut[2] = primColorOut;
         SetMeshOutputsEXT(4, 3);
     }
 }

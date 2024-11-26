@@ -26,9 +26,9 @@ struct CommandBufferContext {
 };
 
 enum class PipelineType {
-    Wireframe, Proxy, ProxyABuffer
+    Wireframe, Proxy, ProxyABuffer, Color
 };
-constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::ProxyABuffer + 1;
+constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::Color + 1;
 
 namespace std {
     inline std::string to_string(PipelineType type) {
@@ -40,6 +40,8 @@ namespace std {
             return "Proxy";
         case PipelineType::ProxyABuffer:
             return "Proxy with ABuffer";
+        case PipelineType::Color:
+            return "Color";
         default:
             throw std::runtime_error("Pipeline type not found");
         }
@@ -77,6 +79,7 @@ struct IContext {
     vk::Pipeline wireframePipeline;
     vk::Pipeline proxyPipeline;
     vk::Pipeline proxyABuffer;
+    vk::Pipeline colorPipeline;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;
@@ -87,7 +90,7 @@ struct IContext {
     float FOV = glm::radians(45.0f);
     glm::vec3 position{ 0.0f, 0.0f, 0.0f };
     glm::vec3 lookAtPosition{ 0.0f, 0.0f, 1.0f };
-    float depth = 1.0f;
+    glm::vec4 colorADepth{1.0f, 1.0f, 1.0f, 1.0f};
     // Settings
     PipelineType type = PipelineType::Wireframe;
     // Queue
@@ -119,6 +122,8 @@ inline vk::Pipeline getFromType(PipelineType type, const IContext& context) {
         return context.proxyPipeline;
     case PipelineType::ProxyABuffer:
         return context.proxyABuffer;
+    case PipelineType::Color:
+        return context.colorPipeline;
     default:
         throw std::runtime_error("Pipeline type not found");
     }
