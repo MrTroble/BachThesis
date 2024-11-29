@@ -27,6 +27,7 @@ struct VTKFile {
     vk::Buffer vertexBuffer;
     vk::Buffer indexBuffer;
     vk::Buffer numberBuffer;
+    vk::Buffer cacheBuffer;
     vk::DescriptorSet descriptor;
     AABB aabb;
 
@@ -35,6 +36,7 @@ struct VTKFile {
         context.device.destroy(vertexBuffer);
         context.device.destroy(indexBuffer);
         context.device.destroy(numberBuffer);
+        context.device.destroy(cacheBuffer);
     }
 };
 
@@ -99,12 +101,18 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     localBufferCreateInfo.size = sizeof(uint32_t) * tetrahedrons.size();
     const auto localNumberBuffer = context.device.createBuffer(localBufferCreateInfo);
     const auto localNumberSize = context.device.getBufferMemoryRequirements(localIndexBuffer).size;
-    const auto sizeOfMemory = localIndexSize + localVertexMemory.size + localNumberSize;
+    localBufferCreateInfo.size = sizeof(glm::vec4) * tetrahedrons.size();
+    const auto localCacheBuffer = context.device.createBuffer(localBufferCreateInfo);
+    const auto localCacheSize = context.device.getBufferMemoryRequirements(localIndexBuffer).size;
+
+    const auto sizeOfMemory = localIndexSize + localVertexMemory.size + localNumberSize + localCacheSize;
     const auto actualeMemory = context.requestMemory(sizeOfMemory,
         vk::MemoryPropertyFlagBits::eDeviceLocal);
     context.device.bindBufferMemory(localVertexBuffer, actualeMemory, 0);
     context.device.bindBufferMemory(localIndexBuffer, actualeMemory, localVertexMemory.size);
     context.device.bindBufferMemory(localNumberBuffer, actualeMemory, localVertexMemory.size + localIndexSize);
+    context.device.bindBufferMemory(localCacheBuffer, actualeMemory,
+        localVertexMemory.size + localIndexSize + localNumberSize);
 
     const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, context.defaultDescriptorSetLayout);
     const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
@@ -112,11 +120,13 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const vk::DescriptorBufferInfo descriptorIndexInfo(localIndexBuffer, 0, VK_WHOLE_SIZE);
     const vk::DescriptorBufferInfo descriptorVertexInfo(localVertexBuffer, 0, VK_WHOLE_SIZE);
     const vk::DescriptorBufferInfo descriptorNumberInfo(localNumberBuffer, 0, VK_WHOLE_SIZE);
+    const vk::DescriptorBufferInfo descriptorCacheInfo(localCacheBuffer, 0, VK_WHOLE_SIZE);
     const vk::WriteDescriptorSet writeCameraSets(descriptor[0], 0, 0, vk::DescriptorType::eUniformBuffer, {}, descriptorCameraInfo);
     const vk::WriteDescriptorSet writeIndexDescriptorSets(descriptor[0], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorIndexInfo);
     const vk::WriteDescriptorSet writeVertexDescriptorSets(descriptor[0], 2, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorVertexInfo);
     const vk::WriteDescriptorSet writeSortIndexDescriptorSets(descriptor[0], 3, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorNumberInfo);
-    std::array writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets, writeSortIndexDescriptorSets };
+    const vk::WriteDescriptorSet writeCacheDescriptorSets(descriptor[0], 4, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorCacheInfo);
+    std::array writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets, writeSortIndexDescriptorSets, writeCacheDescriptorSets };
     context.device.updateDescriptorSets(writeUpdateInfos, {});
 
     auto [commandBuffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
@@ -134,7 +144,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const vk::SubmitInfo submitInfo({}, {}, commandBuffer);
     queue.submit(submitInfo, fence);
 
-    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, descriptor[0], aabb };
+    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, localCacheBuffer, descriptor[0], aabb };
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     if (result != vk::Result::eSuccess)
         throw std::runtime_error("Vulkan Error");

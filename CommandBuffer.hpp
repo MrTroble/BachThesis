@@ -250,6 +250,8 @@ inline void createShaderPipelines(IContext& context) {
         vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings) };
     const vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);

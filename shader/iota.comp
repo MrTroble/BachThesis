@@ -15,9 +15,19 @@ layout (binding=2) buffer Vertex {
 layout(binding=3) buffer block {
     uint toSort[];
 };
+layout(binding=4) buffer block2 {
+    vec4 midpoints[];
+};
 
 void main() {
     for(uint x = 0; x < toSort.length(); x++) {
         toSort[x] = x;
+        uvec4 indexes = index.data[x];
+        vec4 akku = vec4(0.f);
+        for(uint y = 0; y < 4; y++) {
+            akku += vertex.vertexData[indexes[y]];
+        }
+        akku /= 4.0f;
+        midpoints[x] = akku;
     }
 }

@@ -12,8 +12,11 @@ layout (binding=1) buffer Index {
 layout (binding=2) buffer Vertex {
     vec4 vertexData[];
 } vertex;
-layout(binding=2) buffer block {
+layout(binding=3) buffer block {
     uint toSort[];
+};
+layout(binding=4) buffer block2 {
+    vec4 midpoints[];
 };
 
 void main() {
