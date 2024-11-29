@@ -19,6 +19,26 @@ layout(binding=4) buffer block2 {
     vec4 midpoints[];
 };
 
-void main() {
+layout(push_constant) uniform amount {
+    uint size;
+    uint type;
+};
+
+void compareAndSwap(uint v1, uint v2) {
     
+}
+
+void main() {
+    if(type == 0) {
+        for(uint y = size; y > 0; y--) {
+            uint index1 = gl_WorkGroupID.x; 
+            uint index2 = gl_WorkGroupID.x + uint(pow(2, size)) + 1;
+            compareAndSwap(index1, index2);
+        }
+        uint index1 = gl_WorkGroupID.x; 
+        uint index2 = gl_WorkGroupID.x + 1;
+        compareAndSwap(index1, index2);
+    } else {
+        
+    }
 }
