@@ -50,6 +50,14 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     auto& currentBuffer = context.commandBuffer.primaryBuffers[currentImage];
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
+
+    for (const auto& vtk : vtkFiles)
+    {
+        currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeSortPipeline);
+        currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, vtk.descriptor, {});
+        currentBuffer.dispatch(1, 1, 1);
+    }
+
     const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };
     const vk::ClearColorValue blackValue{ 0.0f, 0.0f, 0.0f, 1.0f };
     const vk::ClearValue clearColor(context.type == PipelineType::ProxyABuffer ? blackValue : whiteValue);
@@ -167,9 +175,6 @@ inline void recreatePipeline(IContext& context) {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
     };
 
-    const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
-    const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
-
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };
     vk::Viewport viewport(0, 0, (float)context.currentExtent.width, (float)context.currentExtent.height, 0.0f, 1.0f);
     vk::PipelineViewportStateCreateInfo viewportState({}, viewport, rect2d);
@@ -213,17 +218,6 @@ inline void recreatePipeline(IContext& context) {
         if (result4.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.colorPipeline = result4.value;
-
-        vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, context.defaultPipelineLayout);
-        const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
-        if (result5.result != vk::Result::eSuccess)
-            throw std::runtime_error("Pipeline error!");
-        context.computeInitPipeline = result5.value;
-        computePipeCreateInfo.setStage(sortPipelineShaderStages);
-        const auto result6 = context.device.createComputePipeline({}, computePipeCreateInfo);
-        if (result6.result != vk::Result::eSuccess)
-            throw std::runtime_error("Pipeline error!");
-        context.computeSortPipeline = result6.value;
     }
     else {
         std::array noneMeshShaderStages = {
@@ -267,6 +261,20 @@ inline void createShaderPipelines(IContext& context) {
 
     recreatePipeline(context);
 
+    const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
+    const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
+
+    vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, context.defaultPipelineLayout);
+    const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
+    if (result5.result != vk::Result::eSuccess)
+        throw std::runtime_error("Pipeline error!");
+    context.computeInitPipeline = result5.value;
+    computePipeCreateInfo.setStage(sortPipelineShaderStages);
+    const auto result6 = context.device.createComputePipeline({}, computePipeCreateInfo);
+    if (result6.result != vk::Result::eSuccess)
+        throw std::runtime_error("Pipeline error!");
+    context.computeSortPipeline = result6.value;
+
     const vk::DescriptorPoolSize poolStorageSize(vk::DescriptorType::eStorageBuffer, 3000);
     const vk::DescriptorPoolSize poolUniformSize(vk::DescriptorType::eUniformBuffer, 1000);
     std::array poolSizes{ poolStorageSize, poolUniformSize };
@@ -287,6 +295,8 @@ inline void destroyShaderPipelines(IContext& context) {
         if (pipe)
             context.device.destroy(pipe);
     }
+    context.device.destroy(context.computeInitPipeline);
+    context.device.destroy(context.computeSortPipeline);
 }
 
 struct CameraInfo {

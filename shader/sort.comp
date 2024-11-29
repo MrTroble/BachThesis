@@ -17,7 +17,5 @@ layout(binding=2) buffer block {
 };
 
 void main() {
-    for(uint x = 0; x < toSort.length(); x++) {
-        toSort[x] = x;
-    }
+    
 }
