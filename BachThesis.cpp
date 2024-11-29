@@ -48,13 +48,13 @@ int main()
     const ScopeExit cleanInstance([&]() { icontext.instance.destroy(); });
 
     const auto physicalDevices = icontext.instance.enumeratePhysicalDevices();
+    bool found = false;
     for (const auto physicalDevice : physicalDevices)
     {
         auto queueFamilies = physicalDevice.getQueueFamilyProperties();
         size_t familyIndex = 0;
-        bool found = false;
         for (; familyIndex < queueFamilies.size(); familyIndex++) {
-            if ((queueFamilies[familyIndex].queueFlags & vk::QueueFlagBits::eGraphics) &&
+            if ((queueFamilies[familyIndex].queueFlags & (vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer)) &&
                 glfwGetPhysicalDevicePresentationSupport(icontext.instance, physicalDevice, familyIndex)) {
                 found = true;
                 icontext.physicalDevice = physicalDevice;
@@ -65,6 +65,10 @@ int main()
         }
         if (found)
             break;
+    }
+    if (!found) {
+        std::cerr << "Device or queue not supported!" << std::endl;
+        return -1;
     }
 
     const auto extensionsPresent = icontext.physicalDevice.enumerateDeviceExtensionProperties();

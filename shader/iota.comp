@@ -1,0 +1,23 @@
+#version 460
+
+layout (binding=0) uniform Camera {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    vec4 colorDepth;
+} camera;
+layout (binding=1) buffer Index {
+    uvec4 data[];
+} index;
+layout (binding=2) buffer Vertex {
+    vec4 vertexData[];
+} vertex;
+layout(binding=3) buffer block {
+    uint toSort[];
+};
+
+void main() {
+    for(uint x = 0; x < toSort.length(); x++) {
+        toSort[x] = x;
+    }
+}

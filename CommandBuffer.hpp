@@ -130,7 +130,7 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv" };
     const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -166,6 +166,9 @@ inline void recreatePipeline(IContext& context) {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["color.frag.spv"], "main"},
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
     };
+
+    const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
+    const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
 
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };
     vk::Viewport viewport(0, 0, (float)context.currentExtent.width, (float)context.currentExtent.height, 0.0f, 1.0f);
@@ -210,6 +213,17 @@ inline void recreatePipeline(IContext& context) {
         if (result4.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.colorPipeline = result4.value;
+
+        vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, context.defaultPipelineLayout);
+        const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
+        if (result5.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
+        context.computeInitPipeline = result5.value;
+        computePipeCreateInfo.setStage(sortPipelineShaderStages);
+        const auto result6 = context.device.createComputePipeline({}, computePipeCreateInfo);
+        if (result6.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
+        context.computeSortPipeline = result6.value;
     }
     else {
         std::array noneMeshShaderStages = {
@@ -232,6 +246,7 @@ inline void createShaderPipelines(IContext& context) {
 
     vk::ShaderStageFlags flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
     flagBitsForBindings |= vk::ShaderStageFlagBits::eFragment;
+    flagBitsForBindings |= vk::ShaderStageFlagBits::eCompute;
 
     const std::array bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -239,11 +254,12 @@ inline void createShaderPipelines(IContext& context) {
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings) };
     const vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
-    const auto shaderStageFlags = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
     vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
@@ -251,8 +267,10 @@ inline void createShaderPipelines(IContext& context) {
 
     recreatePipeline(context);
 
-    const vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 100);
-    const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1000, poolSize);
+    const vk::DescriptorPoolSize poolStorageSize(vk::DescriptorType::eStorageBuffer, 3000);
+    const vk::DescriptorPoolSize poolUniformSize(vk::DescriptorType::eUniformBuffer, 1000);
+    std::array poolSizes{ poolStorageSize, poolUniformSize };
+    const vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo({}, 1000, poolSizes);
     context.descriptorPool = context.device.createDescriptorPool(descriptorPoolCreateInfo);
 }
 

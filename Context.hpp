@@ -80,6 +80,8 @@ struct IContext {
     vk::Pipeline proxyPipeline;
     vk::Pipeline proxyABuffer;
     vk::Pipeline colorPipeline;
+    vk::Pipeline computeInitPipeline;
+    vk::Pipeline computeSortPipeline;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;
