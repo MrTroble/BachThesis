@@ -25,18 +25,27 @@ layout(push_constant) uniform amount {
 };
 
 void compareAndSwap(uint v1, uint v2) {
-    
+    mat4 matrix =  camera.proj * camera.view * camera.model;
+    vec4 value1 =  matrix * midpoints[toSort[v1]];
+    float z1 = value1.z / value1.w;
+    vec4 value2 =  matrix * midpoints[toSort[v2]];
+    float z2 = value2.z / value2.w;
+    if((v1 & v2) == 0) {
+        if(z1 < z2)
+            return;
+    } else {
+        if(z1 > z2)
+            return;
+    }
+    uint temp = toSort[v1];
+    toSort[v1] = toSort[v2];
+    toSort[v2] = temp;
 }
 
 void main() {
     if(type == 0) {
-        for(uint y = size; y > 0; y--) {
-            uint index1 = gl_WorkGroupID.x; 
-            uint index2 = gl_WorkGroupID.x + uint(pow(2, size)) + 1;
-            compareAndSwap(index1, index2);
-        }
         uint index1 = gl_WorkGroupID.x; 
-        uint index2 = gl_WorkGroupID.x + 1;
+        uint index2 = gl_WorkGroupID.x + uint(pow(2, size)) + 1;
         compareAndSwap(index1, index2);
     } else {
         
