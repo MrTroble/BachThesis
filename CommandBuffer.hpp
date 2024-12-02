@@ -256,8 +256,10 @@ inline void createShaderPipelines(IContext& context) {
     const vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
+    std::array pushConsts{ vk::PushConstantRange{vk::ShaderStageFlagBits::eCompute, 0, sizeof(uint32_t) * 2} };
+
     std::array descriptorSets = { context.defaultDescriptorSetLayout };
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets);
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConsts);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
 

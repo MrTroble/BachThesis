@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <string>
 #include <glm/glm.hpp>
 #include "Context.hpp"
@@ -28,6 +29,8 @@ struct VTKFile {
     vk::Buffer indexBuffer;
     vk::Buffer numberBuffer;
     vk::Buffer cacheBuffer;
+    vk::CommandPool sortSecondaryPool;
+    vk::CommandBuffer sortSecondary;
     vk::DescriptorSet descriptor;
     AABB aabb;
 
@@ -37,8 +40,34 @@ struct VTKFile {
         context.device.destroy(indexBuffer);
         context.device.destroy(numberBuffer);
         context.device.destroy(cacheBuffer);
+        context.device.destroy(sortSecondaryPool);
     }
 };
+
+uint32_t findPowerBelow(uint32_t n) {
+    int k = 1;
+    while (k > 0 && k < n)
+        k <<= 1;
+    return k >> 1;
+}
+
+void recordBitonicMerge(uint32_t offset, uint32_t n, vk::CommandBuffer buffer, IContext& context) {
+    if (n <= 1) return;
+    const auto m = findPowerBelow(n);
+    const std::array values{ m, offset};
+    buffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0u, values.size() * sizeof(uint32_t), values.data());
+    buffer.dispatch(1, 1, 1);
+    recordBitonicMerge(offset, m, buffer, context);
+    recordBitonicMerge(offset + m, n-m, buffer, context);
+}
+
+void recordBitonicSort(uint32_t offset, uint32_t n, vk::CommandBuffer buffer, IContext& context) {
+    if(n <= 1) return;
+    const auto m = n/2;
+    recordBitonicSort(offset, m, buffer, context);
+    recordBitonicSort(offset + m, n - m, buffer, context);
+    recordBitonicMerge(offset, n, buffer, context);
+}
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
@@ -130,7 +159,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     context.device.updateDescriptorSets(writeUpdateInfos, {});
 
     auto [commandBuffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
-    const vk::CommandBufferBeginInfo beginInfo;
+    vk::CommandBufferBeginInfo beginInfo;
     commandBuffer.begin(beginInfo);
     const vk::BufferCopy copyBuffer(0, 0, vertexByteSize);
     commandBuffer.copyBuffer(stagingBuffer, localVertexBuffer, copyBuffer);
@@ -144,7 +173,21 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const vk::SubmitInfo submitInfo({}, {}, commandBuffer);
     queue.submit(submitInfo, fence);
 
-    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, localCacheBuffer, descriptor[0], aabb };
+    const vk::CommandPoolCreateInfo commandPoolCreate({}, context.primaryFamilyIndex);
+    const auto pool = context.device.createCommandPool(commandPoolCreate);
+
+    const vk::CommandBufferAllocateInfo commandAllocateInfo(pool, vk::CommandBufferLevel::eSecondary, 1);
+    const auto buffer = context.device.allocateCommandBuffers(commandAllocateInfo)[0];
+    
+    vk::CommandBufferInheritanceInfo inheritanceInfo(context.renderPass, 0);
+    beginInfo.setPInheritanceInfo(&inheritanceInfo);
+    buffer.begin(beginInfo);
+    buffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0u, descriptor, {});
+    buffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeSortPipeline);
+    recordBitonicSort(0, tetrahedrons.size(), buffer, context);
+    buffer.end();
+
+    VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, localCacheBuffer, pool, buffer, descriptor[0], aabb };
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     if (result != vk::Result::eSuccess)
         throw std::runtime_error("Vulkan Error");
