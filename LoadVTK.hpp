@@ -4,6 +4,8 @@
 #include <array>
 #include <string>
 #include <glm/glm.hpp>
+#include <iostream>
+
 #include "Context.hpp"
 
 constexpr uint32_t MAX_WORK_GROUPS = 256;
@@ -189,6 +191,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, localCacheBuffer, pool, buffer, descriptor[0], aabb };
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
+    std::cout << "Loaded model: " << vtkFile << std::endl;
     if (result != vk::Result::eSuccess)
         throw std::runtime_error("Vulkan Error");
     context.device.resetFences(fence);

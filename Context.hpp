@@ -95,6 +95,7 @@ struct IContext {
     glm::vec4 colorADepth{1.0f, 1.0f, 1.0f, 1.0f};
     // Settings
     PipelineType type = PipelineType::Wireframe;
+    bool sortingOfPrimitives = false;
     // Queue
     vk::Queue primaryQueue;
 

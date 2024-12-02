@@ -51,11 +51,11 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
 
-    for (const auto& vtk : vtkFiles)
-    {
-        currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeSortPipeline);
-        currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, vtk.descriptor, {});
-        currentBuffer.dispatch(1, 1, 1);
+    if (context.sortingOfPrimitives) {
+        for (const auto& vtk : vtkFiles)
+        {
+            currentBuffer.executeCommands(vtk.sortSecondary);
+        }
     }
 
     const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };

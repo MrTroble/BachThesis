@@ -192,7 +192,10 @@ int main()
         fence = icontext.device.createFence({});
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "Armadillo.vtk"};
+
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk"
+        //,"Armadillo.vtk"
+    };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
         loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));
@@ -275,6 +278,7 @@ int main()
                     icontext.position = middle;
                 }
             }
+            ImGui::Checkbox("Sort primitives", &icontext.sortingOfPrimitives);
         }
         ImGui::End();
         ImGui::Render();
