@@ -22,8 +22,8 @@ layout(binding=4) buffer block2 {
 };
 
 layout(push_constant) uniform amount {
-    uint size;
-    uint type;
+    uint k;
+    uint j;
 };
 
 void compareAndSwap(uint v1, uint v2) {
@@ -35,7 +35,8 @@ void compareAndSwap(uint v1, uint v2) {
     float z1 = value1.z / value1.w;
     vec4 value2 =  matrix * midpoints[toSort[v2]];
     float z2 = value2.z / value2.w;
-    if(z1 > z2)
+    if(((v1 & k) == 0 && z1 <= z2) ||
+       ((v1 & k) != 0 && z1 >= z2))
        return;
     uint temp = toSort[v1];
     toSort[v1] = toSort[v2];
@@ -43,20 +44,8 @@ void compareAndSwap(uint v1, uint v2) {
 }
 
 void main() {
-    const uint amount = size / 2;
-    const uint blockOffset = gl_WorkGroupID.x * size;
-    if(type == 0) {
-        const uint gap = amount + 1;
-        for(uint lOff = 0; lOff < amount; lOff++) {
-            uint index1 = lOff + blockOffset; 
-            uint index2 = index1 + gap;
-            compareAndSwap(index1, index2);
-        }
-    } else {
-        for(uint lOff = 0; lOff < amount; lOff++) {
-            uint index1 = blockOffset + lOff; 
-            uint index2 = blockOffset + size - lOff - 1;
-            compareAndSwap(index1, index2);
-        }
+    uint ij = gl_WorkGroupID.x ^ j;
+    if (ij > gl_WorkGroupID.x) {
+        compareAndSwap(gl_WorkGroupID.x, ij);
     }
 }

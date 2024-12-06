@@ -46,29 +46,29 @@ struct VTKFile {
     }
 };
 
-uint32_t findPowerBelow(uint32_t n) {
+uint32_t findPowerAbove(uint32_t n) {
     int k = 1;
     while (k > 0 && k < n)
         k <<= 1;
-    return k >> 1;
+    return k;
 }
 
-void recordBitonicMerge(uint32_t offset, uint32_t n, vk::CommandBuffer buffer, IContext& context) {
-    if (n <= 1) return;
-    const auto m = findPowerBelow(n);
-    const std::array values{ m, offset};
-    buffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0u, values.size() * sizeof(uint32_t), values.data());
-    buffer.dispatch(1, 1, 1);
-    recordBitonicMerge(offset, m, buffer, context);
-    recordBitonicMerge(offset + m, n-m, buffer, context);
-}
-
-void recordBitonicSort(uint32_t offset, uint32_t n, vk::CommandBuffer buffer, IContext& context) {
-    if(n <= 1) return;
-    const auto m = n/2;
-    recordBitonicSort(offset, m, buffer, context);
-    recordBitonicSort(offset + m, n - m, buffer, context);
-    recordBitonicMerge(offset, n, buffer, context);
+// Source https://courses.cs.duke.edu//fall08/cps196.1/Pthreads/bitonic.c
+void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, vk::Buffer sortBuffer) {
+    const auto N = findPowerAbove(n);
+    uint32_t j, k;
+    const auto flags = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+    vk::BufferMemoryBarrier bufferMemoryBarrier(flags, flags, context.primaryFamilyIndex, context.primaryFamilyIndex, sortBuffer, 0u, VK_WHOLE_SIZE);
+    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+    for (k = 2; k <= N; k = 2 * k) {
+        for (j = k >> 1; j > 0; j = j >> 1) {
+            std::array values = {k, j};
+            buffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0u, 2 * sizeof(uint32_t), values.data());
+            buffer.dispatch(N, 1, 1);
+            buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+        }
+    }
+    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
 }
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
@@ -186,7 +186,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     buffer.begin(beginInfo);
     buffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0u, descriptor, {});
     buffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeSortPipeline);
-    recordBitonicSort(0, tetrahedrons.size(), buffer, context);
+    recordBitonicSort(tetrahedrons.size(), buffer, context, localNumberBuffer);
     buffer.end();
 
     VTKFile file{ tetrahedrons.size(), actualeMemory, localVertexBuffer, localIndexBuffer, localNumberBuffer, localCacheBuffer, pool, buffer, descriptor[0], aabb };
