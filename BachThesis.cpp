@@ -7,6 +7,10 @@
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+#include <chrono>
+#include <deque>
+#include <algorithm>
+#include <numeric>
 
 using namespace std;
 
@@ -205,6 +209,10 @@ int main()
     active.resize(loadedVtkFiles.size(), false);
     active[0] = true;
     const ScopeExit cleanCrystal([&]() { for (auto& file : loadedVtkFiles) file.unload(icontext); });
+    
+    int64_t currentValue = 0;
+    std::deque<float> smoothing;
+    constexpr size_t MAX_SMOOTH = 2000;
 
     while (!glfwWindowShouldClose(icontext.window))
     {
@@ -246,6 +254,9 @@ int main()
                 }
                 ImGui::EndCombo();
             }
+            const auto sum = std::accumulate(smoothing.begin(), smoothing.end(), 0.0f);
+            ImGui::Text("Frametime smoothed: %.3f ms", sum / (1e6f * smoothing.size()));
+            ImGui::Text("Frametime: %.3f ms", currentValue / (1e6f));
             if (ImGui::CollapsingHeader("Models")) {
                 for (size_t i = 0; i < vtkNames.size(); i++)
                 {
@@ -284,6 +295,7 @@ int main()
         ImGui::Render();
 
         rerecordPrimary(icontext, nextImage.value, vtkFiles);
+        const auto startTime = std::chrono::steady_clock::now();
         const auto shaderStage = icontext.meshShader ? vk::PipelineStageFlagBits::eMeshShaderEXT : vk::PipelineStageFlagBits::eTopOfPipe;
         const std::array pipelineFlagBits = { vk::PipelineStageFlagBits::eAllGraphics | shaderStage };
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
@@ -291,6 +303,12 @@ int main()
 
         checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
         icontext.device.resetFences(fencesToCheck[nextImage.value]);
+        const auto afterTime = std::chrono::steady_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(afterTime - startTime);
+        currentValue = duration.count();
+        smoothing.push_back(currentValue);
+        if(smoothing.size() > MAX_SMOOTH)
+            smoothing.pop_front();
 
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
         checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
