@@ -11,6 +11,7 @@ layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
 // Debug Out
+layout(location=1) perprimitiveEXT out flat uint workGroupID[];
 layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
 // Depth output
 layout(location=0) out vec4 depthsMinMax[];
@@ -84,17 +85,6 @@ void main() {
         }
     }
 
-//  ===> DEBUG
-//    if(currentX == FLT_MAX) {
-//        debugExit(0);
-//        return;
-//    }
-//    if(currentXRight == -FLT_MAX) {
-//        debugExit(0);
-//        return;
-//    }
-//  END ===> DEBUG
-
     // Clipping
     if(!allNot) {
         SetMeshOutputsEXT(0, 0);
@@ -118,12 +108,7 @@ void main() {
             otherDist = x;
         }
     }
-//  ===> DEBUG
-//    if(mostDistantOne == 4 || otherDist == 4) {
-//        debugExit(1);
-//        return;
-//    }
-//  END ===> DEBUG
+
     uint triangleOuter[3] = { mostLeft, mostRight, mostDistantOne };
 
     vec2 P2 = screenSpace[mostDistantOne];
@@ -197,6 +182,12 @@ void main() {
         lambdasOut[2] = primColorOut;
         lambdasOut[3] = primColorOut;
 
+        uint currentID = indexesToUse[gl_WorkGroupID.x];
+        workGroupID[0] = currentID;
+        workGroupID[1] = currentID;
+        workGroupID[2] = currentID;
+        workGroupID[3] = currentID;
+
         depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
         SetMeshOutputsEXT(5, 4);
@@ -222,6 +213,12 @@ void main() {
         lambdasOut[0] = primColorOut;
         lambdasOut[1] = primColorOut;
         lambdasOut[2] = primColorOut;
+
+        uint currentID = indexesToUse[gl_WorkGroupID.x];
+        workGroupID[0] = currentID;
+        workGroupID[1] = currentID;
+        workGroupID[2] = currentID;
+
         SetMeshOutputsEXT(4, 3);
     }
 }

@@ -198,7 +198,7 @@ int main()
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
     std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk"
-        //,"Armadillo.vtk"
+        ,"Armadillo.vtk"
     };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
@@ -303,15 +303,17 @@ int main()
 
         checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
         icontext.device.resetFences(fencesToCheck[nextImage.value]);
+
+        const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
+        checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
+
         const auto afterTime = std::chrono::steady_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(afterTime - startTime);
         currentValue = duration.count();
         smoothing.push_back(currentValue);
-        if(smoothing.size() > MAX_SMOOTH)
+        if (smoothing.size() > MAX_SMOOTH)
             smoothing.pop_front();
 
-        const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
-        checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
     }
     icontext.device.waitIdle();
 
