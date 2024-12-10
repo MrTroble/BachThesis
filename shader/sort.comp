@@ -6,6 +6,8 @@ layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;
     mat4 proj;
+    mat4 whole;
+    mat4 inverseM;
     vec4 colorDepth;
 } camera;
 layout (binding=1) buffer Index {

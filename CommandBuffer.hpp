@@ -307,6 +307,8 @@ struct CameraInfo {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+    glm::mat4 whole;
+    glm::mat4 inverse;
     glm::vec4 colorADepth;
 };
 
@@ -321,6 +323,8 @@ inline void updateCamera(IContext& context) {
     lookAt = glm::normalize(lookAt) * context.lookAtPosition.z;
     cameraMap->view = glm::lookAt(context.position + lookAt, context.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
     cameraMap->model = glm::identity<glm::mat4>();
+    cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
+    cameraMap->inverse = glm::inverse(projectionMatrix * cameraMap->view);
     cameraMap->colorADepth = context.colorADepth;
     context.device.unmapMemory(context.cameraStagingMemory);
 

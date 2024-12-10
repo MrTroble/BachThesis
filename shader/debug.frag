@@ -12,14 +12,14 @@ layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;
     mat4 proj;
+    mat4 whole;
+    mat4 inverseM;
     vec4 colorDepth;
 } camera;
 
 void main() {
-    mat4 matInverse = inverse(camera.proj * camera.view);
-
-    vec4 minValue = matInverse * vec4(depthsMinMax.xy, depthsMinMax.z, 1.0f);    
-    vec4 maxValue = matInverse * vec4(depthsMinMax.xy, depthsMinMax.w, 1.0f);
+    vec4 minValue = camera.inverseM * vec4(depthsMinMax.xy, depthsMinMax.z, 1.0f);    
+    vec4 maxValue = camera.inverseM * vec4(depthsMinMax.xy, depthsMinMax.w, 1.0f);
     minValue /= minValue.w;
     maxValue /= maxValue.w;
 
