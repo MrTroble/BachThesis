@@ -64,7 +64,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
         for (j = k >> 1; j > 0; j = j >> 1) {
             std::array values = {k, j};
             buffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0u, 2 * sizeof(uint32_t), values.data());
-            buffer.dispatch(N, 1, 1);
+            buffer.dispatch(n, 1, 1);
             buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
         }
     }

@@ -28,9 +28,52 @@ layout(push_constant) uniform amount {
     uint j;
 };
 
+float aboveLine(vec2 l1, vec2 l2, vec2 p) {
+    vec2 Md = l2 - l1;
+    vec2 n = vec2(Md.y, -Md.x);
+    vec2 dir = l1 - p;
+    return dot(normalize(n), dir);
+}
+
+bool checkIn(vec3 inPoints[4], vec2 p) {
+    const float s1 = sign(aboveLine(inPoints[0].xy, inPoints[1].xy, p));
+    const float s2 = sign(aboveLine(inPoints[1].xy, inPoints[2].xy, p));
+    if(s2 != s1)
+        return false;
+    const float s3 = sign(aboveLine(inPoints[2].xy, inPoints[3].xy, p));
+    if(s2 != s3)
+        return false;
+    const float s4 = sign(aboveLine(inPoints[3].xy, inPoints[0].xy, p));
+    if(s4 != s3)
+        return false;
+    return true;
+}
+
 void compareAndSwap(uint v1, uint v2) {
     uint maxSize = toSort.length();
     if(maxSize <= v1 || maxSize <= v2)
+        return;
+    vec3 screenSpace1[4];
+    vec3 screenSpace2[4];
+    vec2 min1 = vec2(FLT_MAX), max1 = vec2(-FLT_MAX);
+    vec2 min2 = vec2(FLT_MAX), max2 = vec2(-FLT_MAX);
+    uvec4 tetrahedron1 = index.data[toSort[v1]];
+    for(uint i = 0; i < 4; i++) {
+        vec4 values = camera.whole * vertex.vertexData[tetrahedron1[i]];
+        vec3 screen = values.xyz / values.w;
+        screenSpace1[i] = screen;
+        min1 = min(min1, screen.xy);
+        max1 = max(max1, screen.xy);
+    }
+    uvec4 tetrahedron2 = index.data[toSort[v2]];
+    for(uint i = 0; i < 4; i++) {
+        vec4 values = camera.whole * vertex.vertexData[tetrahedron2[i]];
+        vec3 screen = values.xyz / values.w;
+        screenSpace2[i] = screen;
+        min2 = min(min2, screen.xy);
+        max2 = max(max2, screen.xy);
+    }
+    if(!checkIn(min1, max1, min2) && !checkIn(min1, max1, max2) && !checkIn(min2, max2, min1))
         return;
     mat4 matrix =  camera.proj * camera.view * camera.model;
     vec4 value1 = matrix * midpoints[toSort[v1]];
