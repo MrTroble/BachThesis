@@ -35,6 +35,10 @@ float aboveLine(vec2 l1, vec2 l2, vec2 p) {
     return dot(normalize(n), dir);
 }
 
+float distToLine(vec2 l1, vec2 l2, vec2 p) {
+    return abs(aboveLine(l1, l2, p));
+}
+
 bool checkIn(vec3 inPoints[4], vec2 p) {
     const float s1 = sign(aboveLine(inPoints[0].xy, inPoints[1].xy, p));
     const float s2 = sign(aboveLine(inPoints[1].xy, inPoints[2].xy, p));
@@ -49,6 +53,80 @@ bool checkIn(vec3 inPoints[4], vec2 p) {
     return true;
 }
 
+uint[5] sortPoints(vec3[4] screenSpace, uint mostLeft, uint mostRight) {
+    uint[5] values;
+    float distanceToLine = 0;
+    uint mostDistantOne = 4;
+    uint otherDist = 4;
+    for(uint x = 0; x < 4; x++) {
+        if(mostRight == x || mostLeft == x) {
+            continue;
+        }
+        float dist = distToLine(screenSpace[mostLeft].xy, screenSpace[mostRight].xy, screenSpace[x].xy);
+        if(dist > distanceToLine) {
+            distanceToLine = dist;
+            mostDistantOne = x;
+            if(otherDist == 4)
+                otherDist = mostDistantOne;
+        } else {
+            otherDist = x;
+        }
+    }
+
+    vec2 P2 = screenSpace[mostDistantOne].xy;
+    vec2 dP0 = screenSpace[mostLeft].xy - P2;
+    vec2 dP1 = screenSpace[mostRight].xy - P2;
+    vec2 dP3 = screenSpace[otherDist].xy - P2;
+    float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
+    // Multiply inverse
+    vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
+    float lambda2 = 1.0f - lambdas.y - lambdas.x;
+    if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambda2 <= 0.0f) {
+        // Case 2
+        float p2Dist = aboveLine(screenSpace[mostLeft].xy, screenSpace[mostRight].xy, P2);
+        float p3Dist = aboveLine(screenSpace[mostLeft].xy, screenSpace[mostRight].xy, screenSpace[otherDist].xy);
+
+        if(sign(p2Dist) != sign(p3Dist)) {
+            // Case: Line is bisecting the quad
+            values[0] = mostLeft;
+            values[1] = otherDist;
+            values[2] = mostRight;
+            values[3] = mostDistantOne;
+            // 4 points on edge
+            values[4] = 4;
+            return values;
+        } 
+        // Case: We need to find the bisection point
+        vec2 baseline = normalize(screenSpace[mostRight].xy - screenSpace[mostLeft].xy);
+        
+        float w1 = dot(baseline, normalize(screenSpace[mostRight].xy - screenSpace[otherDist].xy));
+        float w2 = dot(baseline, normalize(screenSpace[mostRight].xy - screenSpace[mostDistantOne].xy));
+
+        values[0] = mostLeft;
+        values[1] = otherDist;
+        values[3] = mostDistantOne;
+        values[2] = mostRight;
+        if(w1 < w2) {
+            values[1] = mostDistantOne;
+            values[3] = otherDist;
+        }
+        // 4 points on edge
+        values[4] = 4;
+        return values;
+    }
+    // Case: We have a triangle
+    values[0] = mostLeft;
+    values[1] = mostRight;
+    values[3] = mostDistantOne;
+    // 4 points on edge
+    values[4] = 3;
+    return values;
+} 
+
+bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
+    return false;
+}
+
 void compareAndSwap(uint v1, uint v2) {
     uint maxSize = toSort.length();
     if(maxSize <= v1 || maxSize <= v2)
@@ -57,6 +135,7 @@ void compareAndSwap(uint v1, uint v2) {
     vec3 screenSpace2[4];
     vec2 min1 = vec2(FLT_MAX), max1 = vec2(-FLT_MAX);
     vec2 min2 = vec2(FLT_MAX), max2 = vec2(-FLT_MAX);
+    uint left1 = 5, left2 = 5, right1 = 5, right2 = 5;
     uvec4 tetrahedron1 = index.data[toSort[v1]];
     for(uint i = 0; i < 4; i++) {
         vec4 values = camera.whole * vertex.vertexData[tetrahedron1[i]];
@@ -73,13 +152,17 @@ void compareAndSwap(uint v1, uint v2) {
         min2 = min(min2, screen.xy);
         max2 = max(max2, screen.xy);
     }
-    if(!checkIn(min1, max1, min2) && !checkIn(min1, max1, max2) && !checkIn(min2, max2, min1))
+    // Check AABBs?
+    // Caching of sorting in order to reduce load?
+    // TODO Test if all points are within an other primitives
+    const uint[5] index1 = sortPoints(screenSpace1, left1, right1);
+    const uint[5] index2 = sortPoints(screenSpace2, left2, right2);
+    vec2 pointToTest;
+    if(!getTestPoint(screenSpace1, index1, screenSpace2, index2, pointToTest))
         return;
-    mat4 matrix =  camera.proj * camera.view * camera.model;
-    vec4 value1 = matrix * midpoints[toSort[v1]];
-    float z1 = value1.z / value1.w;
-    vec4 value2 =  matrix * midpoints[toSort[v2]];
-    float z2 = value2.z / value2.w;
+    // TODO
+    float z1 = 0;
+    float z2 = 0;
     if(((v1 & k) == 0 && z1 <= z2) ||
        ((v1 & k) != 0 && z1 >= z2))
        return;
