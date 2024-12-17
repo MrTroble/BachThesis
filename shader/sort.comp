@@ -123,7 +123,42 @@ uint[5] sortPoints(vec3[4] screenSpace, uint mostLeft, uint mostRight) {
     return values;
 } 
 
+bool getTestPointFirstCase(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
+        for(uint i1 = 0; i1 < index1[4]; i1++) {
+        vec2 begin1 = screenSpace1[i1].xy;
+        vec2 end1 = screenSpace1[(i1 + 1) % index1[4]].xy;
+
+        for(uint i2 = 0; i2 < index2[4]; i2++) {
+}
+}
+}
+
 bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
+    uint foundAmount = 0;
+    uvec2 edgePairs[2];
+    for(uint i1 = 0; i1 < index1[4]; i1++) {
+        vec2 begin1 = screenSpace1[i1].xy;
+        vec2 end1 = screenSpace1[(i1 + 1) % index1[4]].xy;
+        vec2 point2 = screenSpace2[i1].xy;
+        foundAmount = 0;
+        for(uint i2 = 0; i2 < index2[4]; i2++) {
+           vec2 begin2 = screenSpace2[i2].xy;
+           vec2 end2 = screenSpace2[(i2 + 1) % index2[4]].xy;
+           const float signBegin = sign(aboveLine(begin1, end1, begin2));
+           const float signEnd = sign(aboveLine(begin1, end1, end2));
+           const float sign2Begin = sign(aboveLine(begin1, end1, point2));
+           if(signBegin != signEnd) {
+              const float sign2Begin = sign(aboveLine(begin2, end2, begin1));
+              const float sign2End = sign(aboveLine(begin2, end2, end1));
+              if(sign2Begin != sign2End) {
+                edgePairs[foundAmount] = uvec2(i1, i2);
+                if(foundAmount == 2) break;
+                
+              }
+           }
+        }
+        if(foundAmount == 2) break;
+    }
     return false;
 }
 
