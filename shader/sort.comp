@@ -39,15 +39,15 @@ float distToLine(vec2 l1, vec2 l2, vec2 p) {
     return abs(aboveLine(l1, l2, p));
 }
 
-bool checkIn(vec3 inPoints[4], vec2 p) {
-    const float s1 = sign(aboveLine(inPoints[0].xy, inPoints[1].xy, p));
-    const float s2 = sign(aboveLine(inPoints[1].xy, inPoints[2].xy, p));
+bool checkIn(vec3 inPoints[4], uint[5] index, vec2 p) {
+    const float s1 = sign(aboveLine(inPoints[index[0]].xy, inPoints[index[1]].xy, p));
+    const float s2 = sign(aboveLine(inPoints[index[1]].xy, inPoints[index[2]].xy, p));
     if(s2 != s1)
         return false;
-    const float s3 = sign(aboveLine(inPoints[2].xy, inPoints[3].xy, p));
+    const float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[3]].xy, p));
     if(s2 != s3)
         return false;
-    const float s4 = sign(aboveLine(inPoints[3].xy, inPoints[0].xy, p));
+    const float s4 = sign(aboveLine(inPoints[index[3]].xy, inPoints[index[0]].xy, p));
     if(s4 != s3)
         return false;
     return true;
@@ -136,9 +136,16 @@ vec2 getMidPoint(vec3[4] screenSpace1, vec3[4] screenSpace2, uvec2 firstLine, uv
 
 bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
     for(uint i1 = 0; i1 < index1[4]; i1++) {
-        vec2 begin1 = screenSpace2[i1].xy;
-        if(checkIn(screenSpace2, begin1)) {
+        vec2 begin1 = screenSpace1[i1].xy;
+        if(checkIn(screenSpace1, index1, begin1)) {
             pointToCheck = begin1;
+            return true;
+        }
+    }
+    for(uint i2 = 0; i2 < index2[4]; i2++) {
+        vec2 begin2 = screenSpace2[i2].xy;
+        if(checkIn(screenSpace2, index2, begin2)) {
+            pointToCheck = begin2;
             return true;
         }
     }
