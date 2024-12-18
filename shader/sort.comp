@@ -121,40 +121,60 @@ uint[5] sortPoints(vec3[4] screenSpace, uint mostLeft, uint mostRight) {
     // 4 points on edge
     values[4] = 3;
     return values;
-} 
+}
+
+vec2 getMidPoint(vec3[4] screenSpace1, vec3[4] screenSpace2, uvec2 firstLine, uvec2 secondLine) {
+    vec2 P1 = screenSpace1[firstLine.x].xy;
+    vec2 P0 = screenSpace1[secondLine.x].xy;
+    vec2 dP31 = screenSpace2[firstLine.y].xy - P1;
+    vec2 dP20 = screenSpace2[secondLine.y].xy - P0;
+    vec2 dP01 = P0 - P1;
+    
+    float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
+    return P1 + dP31 * s;
+}
 
 bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
-    uint foundAmount = 0;
-    uvec2 edgePairs[2];
-    for(uint i2 = 0; i2 < index2[4]; i2++) {
-        vec2 begin2 = screenSpace2[i2].xy;
-        vec2 end2 = screenSpace2[(i2 + 1) % index2[4]].xy;
-        for(uint i1 = 0; i1 < index1[4]; i1++) {
-            // TODO Test if any point is within an other primitive
+    for(uint i1 = 0; i1 < index1[4]; i1++) {
+        vec2 begin1 = screenSpace2[i1].xy;
+        if(checkIn(screenSpace2, begin1)) {
+            pointToCheck = begin1;
+            return true;
         }
     }
-    for(uint i1 = 0; i1 < index1[4]; i1++) {
-        vec2 begin1 = screenSpace1[i1].xy;
-        vec2 end1 = screenSpace1[(i1 + 1) % index1[4]].xy;
-        vec2 point2 = screenSpace2[i1].xy;
+    uint foundAmount = 0;
+    uint i1 = 0;
+    uint edgesIntersected[2];
+    for(; i1 < index1[4]; i1++) {
+        vec2 begin1 = screenSpace1[index1[i1]].xy;
+        vec2 end1 = screenSpace1[index1[(i1 + 1) % index1[4]]].xy;
         foundAmount = 0;
         for(uint i2 = 0; i2 < index2[4]; i2++) {
-           vec2 begin2 = screenSpace2[i2].xy;
-           vec2 end2 = screenSpace2[(i2 + 1) % index2[4]].xy;
+           vec2 begin2 = screenSpace2[index2[i2]].xy;
+           vec2 end2 = screenSpace2[index2[(i2 + 1) % index2[4]]].xy;
            const float signBegin = sign(aboveLine(begin1, end1, begin2));
            const float signEnd = sign(aboveLine(begin1, end1, end2));
            if(signBegin != signEnd) {
               const float sign2Begin = sign(aboveLine(begin2, end2, begin1));
               const float sign2End = sign(aboveLine(begin2, end2, end1));
               if(sign2Begin != sign2End) {
-                edgePairs[foundAmount] = uvec2(i1, i2);
+                edgesIntersected[foundAmount] = i2;
                 if(foundAmount == 2) break;
               }
            }
         }
         if(foundAmount == 2) break;
     }
-    return false;
+    if(foundAmount != 2) return false;
+    uvec2 edge1 = uvec2(index1[i1], index1[(i1 + 1) % index1[4]]);
+    uvec2 edge2 = uvec2(index1[edgesIntersected[0]], index1[(edgesIntersected[0] + 1) % index1[4]]);
+    uvec2 edge3 = uvec2(index1[edgesIntersected[1]], index1[(edgesIntersected[1] + 1) % index1[4]]);
+
+    vec2 midpoint1 = getMidPoint(screenSpace1, screenSpace2, edge1, edge2);
+    vec2 midpoint2 = getMidPoint(screenSpace1, screenSpace2, edge1, edge3);
+    vec2 halfDist = (midpoint2 - midpoint1) * 0.5;
+    pointToCheck = midpoint1 + halfDist;
+    return true;
 }
 
 void compareAndSwap(uint v1, uint v2) {

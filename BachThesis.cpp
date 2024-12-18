@@ -301,11 +301,11 @@ int main()
         const vk::SubmitInfo submitInfo(acquireSemaphore, pipelineFlagBits, icontext.commandBuffer.primaryBuffers[nextImage.value], waitSemaphore);
         icontext.primaryQueue.submit(submitInfo, fencesToCheck[nextImage.value]);
 
-        checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
-        icontext.device.resetFences(fencesToCheck[nextImage.value]);
-
         const vk::PresentInfoKHR presentInfo(waitSemaphore, icontext.swapchain, nextImage.value);
         checkErrorOrRecreate((vk::Result)vkQueuePresentKHR((VkQueue)icontext.primaryQueue, (VkPresentInfoKHR*)&presentInfo), icontext);
+
+        checkErrorOrRecreate(icontext.device.waitForFences(fencesToCheck[nextImage.value], true, std::numeric_limits<uint64_t>().max()), icontext);
+        icontext.device.resetFences(fencesToCheck[nextImage.value]);
 
         const auto afterTime = std::chrono::steady_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(afterTime - startTime);
