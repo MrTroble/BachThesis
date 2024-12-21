@@ -135,7 +135,7 @@ vec2 getMidPoint(vec3[4] screenSpace1, vec3[4] screenSpace2, uvec2 firstLine, uv
     return P1 + dP31 * s;
 }
 
-vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec3 point) {
+vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec2 point) {
     vec2 dP0 = p0 - p2;
     vec2 dP1 = p1 - p2;
     vec2 dP3 = point - p2;
@@ -147,19 +147,18 @@ vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec3 point) {
 }
 
 float getZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
-    vec3 midPoint = screenSpace1[index1[3]];
     vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[1]], screenSpace1[index1[2]]};
-    vec3 lambdas1 = getLamdas(values1[0], values1[1], values1[2], point);
+    vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
     // TODO 
     if(lambdas1.x <= 0.0f || lambdas1.y <= 0.0f || lambdas1.z <= 0.0f) {
         vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[2]], screenSpace1[index1[3]]};
-        vec3 lambdas1 = getLamdas(values1[0], values1[1], values1[2], point);
+        vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
         return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
     }
     return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
 }
 
-bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 point) {
+bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
     for(uint i1 = 0; i1 < index1[4]; i1++) {
         vec2 begin1 = screenSpace1[i1].xy;
         if(checkIn(screenSpace1, index1, begin1)) {
@@ -218,7 +217,7 @@ void compareAndSwap(uint v1, uint v2) {
     vec2 min1 = vec2(FLT_MAX), max1 = vec2(-FLT_MAX);
     vec2 min2 = vec2(FLT_MAX), max2 = vec2(-FLT_MAX);
     uint left1 = 5, left2 = 5, right1 = 5, right2 = 5;
-    float leftX1 = 5, leftX2 = 5, rightX1 = 5, rightX2 = 5;
+    float leftX1 = FLT_MAX, leftX2 = FLT_MAX, rightX1 = -FLT_MAX, rightX2 = -FLT_MAX;
     uvec4 tetrahedron1 = index.data[toSort[v1]];
     for(uint i = 0; i < 4; i++) {
         vec4 values = camera.whole * vertex.vertexData[tetrahedron1[i]];
@@ -227,11 +226,11 @@ void compareAndSwap(uint v1, uint v2) {
         min1 = min(min1, screen.xy);
         max1 = max(max1, screen.xy);
         if(leftX1 > screen.x) {
-            leftX1 = screen.x
+            leftX1 = screen.x;
             left1 = i;
         }
         if(rightX1 < screen.x) {
-            rightX1 = screen.x
+            rightX1 = screen.x;
             right1 = i;
         }
     }
@@ -243,11 +242,11 @@ void compareAndSwap(uint v1, uint v2) {
         min2 = min(min2, screen.xy);
         max2 = max(max2, screen.xy);
         if(leftX2 > screen.x) {
-            leftX2 = screen.x
+            leftX2 = screen.x;
             left2 = i;
         }
         if(rightX2 < screen.x) {
-            rightX2 = screen.x
+            rightX2 = screen.x;
             right2 = i;
         }
     }
