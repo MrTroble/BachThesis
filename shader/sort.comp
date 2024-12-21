@@ -135,11 +135,31 @@ vec2 getMidPoint(vec3[4] screenSpace1, vec3[4] screenSpace2, uvec2 firstLine, uv
     return P1 + dP31 * s;
 }
 
-float getMinZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
-    
+vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec3 point) {
+    vec2 dP0 = p0 - p2;
+    vec2 dP1 = p1 - p2;
+    vec2 dP3 = point - p2;
+    float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
+    // Multiply inverse
+    vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
+    float lambda2 = 1.0f - lambdas.y - lambdas.x;
+    return vec3(lambdas, lambda2);
 }
 
-bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out float z1, out float z2) {
+float getZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
+    vec3 midPoint = screenSpace1[index1[3]];
+    vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[1]], screenSpace1[index1[2]]};
+    vec3 lambdas1 = getLamdas(values1[0], values1[1], values1[2], point);
+    // TODO 
+    if(lambdas1.x <= 0.0f || lambdas1.y <= 0.0f || lambdas1.z <= 0.0f) {
+        vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[2]], screenSpace1[index1[3]]};
+        vec3 lambdas1 = getLamdas(values1[0], values1[1], values1[2], point);
+        return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
+    }
+    return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
+}
+
+bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 point) {
     for(uint i1 = 0; i1 < index1[4]; i1++) {
         vec2 begin1 = screenSpace1[i1].xy;
         if(checkIn(screenSpace1, index1, begin1)) {
@@ -235,10 +255,11 @@ void compareAndSwap(uint v1, uint v2) {
     // Caching of sorting in order to reduce load?
     const uint[5] index1 = sortPoints(screenSpace1, left1, right1);
     const uint[5] index2 = sortPoints(screenSpace2, left2, right2);
-    float z1 = 0;
-    float z2 = 0;
-    if(!getTestPoint(screenSpace1, index1, screenSpace2, index2, z1, z2))
+    vec2 pointFound;
+    if(!getTestPoint(screenSpace1, index1, screenSpace2, index2, pointFound))
         return;
+    float z1 = getZAtPoint(screenSpace1, index1, pointFound);
+    float z2 = getZAtPoint(screenSpace2, index2, pointFound);
     if(((v1 & k) == 0 && z1 <= z2) ||
        ((v1 & k) != 0 && z1 >= z2))
        return;
