@@ -117,7 +117,8 @@ uint[5] sortPoints(vec3[4] screenSpace, uint mostLeft, uint mostRight) {
     // Case: We have a triangle
     values[0] = mostLeft;
     values[1] = mostRight;
-    values[3] = mostDistantOne;
+    values[2] = mostDistantOne;
+    values[3] = otherDist;
     // 4 points on edge
     values[4] = 3;
     return values;
@@ -134,7 +135,11 @@ vec2 getMidPoint(vec3[4] screenSpace1, vec3[4] screenSpace2, uvec2 firstLine, uv
     return P1 + dP31 * s;
 }
 
-bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
+float getMinZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
+    
+}
+
+bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out float z1, out float z2) {
     for(uint i1 = 0; i1 < index1[4]; i1++) {
         vec2 begin1 = screenSpace1[i1].xy;
         if(checkIn(screenSpace1, index1, begin1)) {
@@ -193,6 +198,7 @@ void compareAndSwap(uint v1, uint v2) {
     vec2 min1 = vec2(FLT_MAX), max1 = vec2(-FLT_MAX);
     vec2 min2 = vec2(FLT_MAX), max2 = vec2(-FLT_MAX);
     uint left1 = 5, left2 = 5, right1 = 5, right2 = 5;
+    float leftX1 = 5, leftX2 = 5, rightX1 = 5, rightX2 = 5;
     uvec4 tetrahedron1 = index.data[toSort[v1]];
     for(uint i = 0; i < 4; i++) {
         vec4 values = camera.whole * vertex.vertexData[tetrahedron1[i]];
@@ -200,6 +206,14 @@ void compareAndSwap(uint v1, uint v2) {
         screenSpace1[i] = screen;
         min1 = min(min1, screen.xy);
         max1 = max(max1, screen.xy);
+        if(leftX1 > screen.x) {
+            leftX1 = screen.x
+            left1 = i;
+        }
+        if(rightX1 < screen.x) {
+            rightX1 = screen.x
+            right1 = i;
+        }
     }
     uvec4 tetrahedron2 = index.data[toSort[v2]];
     for(uint i = 0; i < 4; i++) {
@@ -208,17 +222,23 @@ void compareAndSwap(uint v1, uint v2) {
         screenSpace2[i] = screen;
         min2 = min(min2, screen.xy);
         max2 = max(max2, screen.xy);
+        if(leftX2 > screen.x) {
+            leftX2 = screen.x
+            left2 = i;
+        }
+        if(rightX2 < screen.x) {
+            rightX2 = screen.x
+            right2 = i;
+        }
     }
     // Check AABBs?
     // Caching of sorting in order to reduce load?
     const uint[5] index1 = sortPoints(screenSpace1, left1, right1);
     const uint[5] index2 = sortPoints(screenSpace2, left2, right2);
-    vec2 pointToTest;
-    if(!getTestPoint(screenSpace1, index1, screenSpace2, index2, pointToTest))
-        return;
-    // TODO
     float z1 = 0;
     float z2 = 0;
+    if(!getTestPoint(screenSpace1, index1, screenSpace2, index2, z1, z2))
+        return;
     if(((v1 & k) == 0 && z1 <= z2) ||
        ((v1 & k) != 0 && z1 >= z2))
        return;
