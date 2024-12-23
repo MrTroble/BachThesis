@@ -10,10 +10,17 @@
 
 constexpr uint32_t MAX_WORK_GROUPS = 256;
 
-struct Tetrahedron {
-    uint32_t p1, p2, p3, p4;
-};
+using VertIndex = size_t;
+
+using Tetrahedron = VertIndex[4];
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
+using TetIndex = size_t;
+
+enum class EdgeType : size_t {
+    Point = 1, Edge = 2, Face = 3
+};
+
+using Connection = std::tuple<TetIndex, EdgeType>;
 
 struct AABB {
     glm::vec3 min{ FLT_MAX };
@@ -62,7 +69,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
     for (k = 2; k <= N; k = 2 * k) {
         for (j = k >> 1; j > 0; j = j >> 1) {
-            std::array values = {k, j};
+            std::array values = { k, j };
             buffer.pushConstants(context.defaultPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0u, 2 * sizeof(uint32_t), values.data());
             buffer.dispatch(n, 1, 1);
             buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
@@ -70,6 +77,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     }
     buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
 }
+
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
@@ -93,14 +101,46 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         }
         else if (value == "t") {
             Tetrahedron tetrahedron;
-            valueVTK >> tetrahedron.p1 >> tetrahedron.p2 >>
-                tetrahedron.p3 >> tetrahedron.p4;
+            valueVTK >> tetrahedron[0] >> tetrahedron[1] >>
+                tetrahedron[2] >> tetrahedron[3];
             tetrahedrons.push_back(tetrahedron);
         }
         else {
             assert(false);
         }
     }
+
+    std::vector<std::vector<TetIndex>> vertexConnection(vertices.size());
+    for (TetIndex i = 0; i < tetrahedrons.size(); i++)
+    {
+        const auto& tetrahedron = tetrahedrons[i];
+        for (size_t j = 0; j < 4; j++)
+            vertexConnection[j].push_back(i);
+    }
+
+    std::vector<std::vector<Connection>> tetrahedronGraph(tetrahedrons.size());
+    thread_local std::unordered_map<TetIndex, size_t> currentTetValues;
+    size_t currentIndex = 0;
+    for (const auto& tet : tetrahedrons)
+    {
+        currentTetValues.clear();
+        for (size_t i = 0; i < 4; i++)
+        {
+            const auto value = tet[i];
+            const auto& connected = vertexConnection[value];
+            for (const auto otherTetIndex : connected) {
+                currentTetValues[otherTetIndex]++;
+            }
+        }
+        for (const auto& [index, amount] : currentTetValues)
+        {
+            assert(amount < 4);
+            auto& edgeList = tetrahedronGraph[currentIndex++];
+            edgeList.emplace_back(index, (EdgeType)amount);
+        }
+    }
+
+
     const auto tetrahedronByteSize = tetrahedrons.size() * sizeof(Tetrahedron);
     const auto vertexByteSize = vertices.size() * sizeof(glm::vec4);
     const vk::BufferCreateInfo stagingBufferCreateInfo({},
@@ -180,7 +220,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     const vk::CommandBufferAllocateInfo commandAllocateInfo(pool, vk::CommandBufferLevel::eSecondary, 1);
     const auto buffer = context.device.allocateCommandBuffers(commandAllocateInfo)[0];
-    
+
     vk::CommandBufferInheritanceInfo inheritanceInfo(context.renderPass, 0);
     beginInfo.setPInheritanceInfo(&inheritanceInfo);
     buffer.begin(beginInfo);

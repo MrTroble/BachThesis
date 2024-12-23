@@ -149,7 +149,6 @@ vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec2 point) {
 float getZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
     vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[1]], screenSpace1[index1[2]]};
     vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
-    // TODO 
     if(lambdas1.x <= 0.0f || lambdas1.y <= 0.0f || lambdas1.z <= 0.0f) {
         vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[2]], screenSpace1[index1[3]]};
         vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
@@ -259,6 +258,7 @@ void compareAndSwap(uint v1, uint v2) {
         return;
     float z1 = getZAtPoint(screenSpace1, index1, pointFound);
     float z2 = getZAtPoint(screenSpace2, index2, pointFound);
+    // TODO z might be really close on adjacent tetrahedrons
     if(((v1 & k) == 0 && z1 <= z2) ||
        ((v1 & k) != 0 && z1 >= z2))
        return;
