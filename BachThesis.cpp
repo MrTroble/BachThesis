@@ -198,7 +198,7 @@ int main()
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
     std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk"
-        ,"Armadillo.vtk"
+        //,"Armadillo.vtk"
     };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {

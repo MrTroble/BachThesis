@@ -10,9 +10,11 @@
 
 constexpr uint32_t MAX_WORK_GROUPS = 256;
 
-using VertIndex = size_t;
+using VertIndex = uint32_t;
 
-using Tetrahedron = std::array<VertIndex, 4>;
+struct Tetrahedron {
+    VertIndex indices[4];
+};
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 using TetIndex = size_t;
 
@@ -101,8 +103,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         }
         else if (value == "t") {
             Tetrahedron tetrahedron;
-            valueVTK >> tetrahedron[0] >> tetrahedron[1] >>
-                tetrahedron[2] >> tetrahedron[3];
+            valueVTK >> tetrahedron.indices[0] >> tetrahedron.indices[1] >>
+                tetrahedron.indices[2] >> tetrahedron.indices[3];
             tetrahedrons.push_back(tetrahedron);
         }
         else {
@@ -111,14 +113,16 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     }
 
     std::vector<std::vector<TetIndex>> vertexConnection(vertices.size());
+    for(auto& vec : vertexConnection) vec.reserve(64);
     for (TetIndex i = 0; i < tetrahedrons.size(); i++)
     {
         const auto& tetrahedron = tetrahedrons[i];
         for (size_t j = 0; j < 4; j++)
-            vertexConnection[tetrahedron[j]].push_back(i);
+            vertexConnection[tetrahedron.indices[j]].push_back(i);
     }
 
     std::vector<std::vector<Connection>> tetrahedronGraph(tetrahedrons.size());
+    for (auto& vec : tetrahedronGraph) vec.reserve(64);
     thread_local std::unordered_map<TetIndex, size_t> currentTetValues;
     size_t currentIndex = 0;
     for (const auto& tet : tetrahedrons)
@@ -126,7 +130,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         currentTetValues.clear();
         for (size_t i = 0; i < 4; i++)
         {
-            const auto value = tet[i];
+            const auto value = tet.indices[i];
             const auto& connected = vertexConnection[value];
             for (const auto otherTetIndex : connected) {
                 if(otherTetIndex == currentIndex) continue;
@@ -142,6 +146,23 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         currentIndex++;
     }
 
+    std::vector<char> allowedToTake(tetrahedrons.size(), true);
+    // Finding outer tetrahedron and their direct neighbours
+    // Do not use as prey -> 3.4 Boundary preservation tests
+    for (size_t i = 0; i < tetrahedrons.size(); i++)
+    {
+        const auto& connected = tetrahedronGraph[i];
+        size_t amount = 0;
+        for (const auto& [other, type] : connected) {
+            if(type == EdgeType::Face) amount++;
+            if(amount == 3) break;
+        }
+        if (amount == 3) continue;
+        allowedToTake[i] = false;
+        for (const auto& [other, type] : connected) {
+            allowedToTake[other] = false;
+        }
+    }
 
     const auto tetrahedronByteSize = tetrahedrons.size() * sizeof(Tetrahedron);
     const auto vertexByteSize = vertices.size() * sizeof(glm::vec4);
