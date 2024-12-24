@@ -12,7 +12,7 @@ constexpr uint32_t MAX_WORK_GROUPS = 256;
 
 using VertIndex = size_t;
 
-using Tetrahedron = VertIndex[4];
+using Tetrahedron = std::array<VertIndex, 4>;
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 using TetIndex = size_t;
 
@@ -115,7 +115,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     {
         const auto& tetrahedron = tetrahedrons[i];
         for (size_t j = 0; j < 4; j++)
-            vertexConnection[j].push_back(i);
+            vertexConnection[tetrahedron[j]].push_back(i);
     }
 
     std::vector<std::vector<Connection>> tetrahedronGraph(tetrahedrons.size());
@@ -129,15 +129,17 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             const auto value = tet[i];
             const auto& connected = vertexConnection[value];
             for (const auto otherTetIndex : connected) {
+                if(otherTetIndex == currentIndex) continue;
                 currentTetValues[otherTetIndex]++;
             }
         }
         for (const auto& [index, amount] : currentTetValues)
         {
             assert(amount < 4);
-            auto& edgeList = tetrahedronGraph[currentIndex++];
+            auto& edgeList = tetrahedronGraph[currentIndex];
             edgeList.emplace_back(index, (EdgeType)amount);
         }
+        currentIndex++;
     }
 
 
