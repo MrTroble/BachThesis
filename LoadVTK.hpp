@@ -34,6 +34,21 @@ inline AABB extendAABB(const AABB& aabb1, const AABB& aabb2) {
     return { glm::min(aabb1.min, aabb2.min), glm::max(aabb1.max, aabb2.max) };
 }
 
+struct LODTetrahedron {
+    float previous[4];
+    float next;
+    TetIndex tetrahedron;
+};
+
+struct LODLevel {
+    std::vector<LODTetrahedron> lodBuffer;
+    std::vector<bool> usageAfter;
+    vk::DescriptorSet setForLOD;
+    vk::Buffer lodBuffer;
+    vk::Buffer usageBuffer;
+};
+constexpr std::array COLAPSING_PER_LEVEL = { 10u, 10u, 10u, 10u, 10u };
+
 struct VTKFile {
     size_t amountOfTetrahedrons;
     vk::DeviceMemory memory;
@@ -80,28 +95,6 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     }
     buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
 }
-
-struct CollapsedTetrahedron {
-    TetIndex tetrahedron;
-    float value; 
-};
-
-struct OriginalTetrahedron {
-    TetIndex tetrahedron;
-    float values[4];
-};
-
-struct LODLevel {
-    std::vector<CollapsedTetrahedron> toCollapse;
-    std::vector<OriginalTetrahedron> toReverse;
-    std::vector<bool> usageAfter;
-    vk::DescriptorSet setForLOD;
-    vk::Buffer toCollapseBuffer;
-    vk::Buffer toReverseBuffer;
-    vk::Buffer usageBuffer;
-};
-
-constexpr std::array COLAPSING_PER_LEVEL = { 10u, 10u, 10u, 10u, 10u };
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
