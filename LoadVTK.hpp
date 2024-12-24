@@ -5,6 +5,7 @@
 #include <string>
 #include <glm/glm.hpp>
 #include <iostream>
+#include <bitset>
 
 #include "Context.hpp"
 
@@ -16,9 +17,9 @@ struct Tetrahedron {
     VertIndex indices[4];
 };
 constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
-using TetIndex = size_t;
+using TetIndex = uint32_t;
 
-enum class EdgeType : size_t {
+enum class EdgeType : uint32_t {
     Point = 1, Edge = 2, Face = 3
 };
 
@@ -80,6 +81,27 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
 }
 
+struct CollapsedTetrahedron {
+    TetIndex tetrahedron;
+    float value; 
+};
+
+struct OriginalTetrahedron {
+    TetIndex tetrahedron;
+    float values[4];
+};
+
+struct LODLevel {
+    std::vector<CollapsedTetrahedron> toCollapse;
+    std::vector<OriginalTetrahedron> toReverse;
+    std::vector<bool> usageAfter;
+    vk::DescriptorSet setForLOD;
+    vk::Buffer toCollapseBuffer;
+    vk::Buffer toReverseBuffer;
+    vk::Buffer usageBuffer;
+};
+
+constexpr std::array COLAPSING_PER_LEVEL = { 10u, 10u, 10u, 10u, 10u };
 
 VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::ifstream valueVTK(vtkFile);
@@ -163,6 +185,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             allowedToTake[other] = false;
         }
     }
+
+    
 
     const auto tetrahedronByteSize = tetrahedrons.size() * sizeof(Tetrahedron);
     const auto vertexByteSize = vertices.size() * sizeof(glm::vec4);

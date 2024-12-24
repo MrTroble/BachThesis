@@ -98,6 +98,9 @@ struct IContext {
     bool sortingOfPrimitives = false;
     // Queue
     vk::Queue primaryQueue;
+    // LOD
+    bool useLOD;
+    float currentLOD;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();

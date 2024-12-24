@@ -289,6 +289,10 @@ int main()
                     icontext.position = middle;
                 }
             }
+            if (ImGui::CollapsingHeader("LOD")) {
+                ImGui::Checkbox("Use LOD", &icontext.useLOD);
+                ImGui::SliderFloat("LOD", &icontext.currentLOD, 0, 5.0f);
+            }
             ImGui::Checkbox("Sort primitives", &icontext.sortingOfPrimitives);
         }
         ImGui::End();
