@@ -19,9 +19,6 @@ layout (binding=2) buffer Vertex {
 layout(binding=3) buffer block {
     uint toSort[];
 };
-layout(binding=4) buffer block2 {
-    vec4 midpoints[];
-};
 
 layout(push_constant) uniform amount {
     uint k;

@@ -1,35 +1,11 @@
 #version 460
 
-layout (binding=0) uniform Camera {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-    mat4 whole;
-    mat4 inverseM;
-    vec4 colorDepth;
-} camera;
-layout (binding=1) buffer Index {
-    uvec4 data[];
-} index;
-layout (binding=2) buffer Vertex {
-    vec4 vertexData[];
-} vertex;
 layout(binding=3) buffer block {
     uint toSort[];
-};
-layout(binding=4) buffer block2 {
-    vec4 midpoints[];
 };
 
 void main() {
     for(uint x = 0; x < toSort.length(); x++) {
         toSort[x] = x;
-        uvec4 indexes = index.data[x];
-        vec4 akku = vec4(0.f);
-        for(uint y = 0; y < 4; y++) {
-            akku += vertex.vertexData[indexes[y]];
-        }
-        akku /= 4.0f;
-        midpoints[x] = akku;
     }
 }
