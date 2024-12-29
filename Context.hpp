@@ -74,6 +74,7 @@ struct IContext {
     // Shader/Pipes
     std::unordered_map<std::string, vk::ShaderModule> shaderModule;
     vk::DescriptorSetLayout defaultDescriptorSetLayout;
+    vk::DescriptorSetLayout lodDescriptorSetLayout;
     vk::PipelineLayout defaultPipelineLayout;
     vk::DescriptorPool descriptorPool;    
     vk::Pipeline wireframePipeline;

@@ -250,15 +250,21 @@ inline void createShaderPipelines(IContext& context) {
         vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer,
-                    1, flagBitsForBindings),
-        vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings) };
     const vk::DescriptorSetLayoutCreateInfo descriptorSetCreateInfo({}, bindings);
     context.defaultDescriptorSetLayout = context.device.createDescriptorSetLayout(descriptorSetCreateInfo);
 
+    const std::array lodBindings = {
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings) };
+    const vk::DescriptorSetLayoutCreateInfo lodBindingsSetCreateInfo({}, lodBindings);
+    context.lodDescriptorSetLayout = context.device.createDescriptorSetLayout(lodBindingsSetCreateInfo);
+
     std::array pushConsts{ vk::PushConstantRange{vk::ShaderStageFlagBits::eCompute, 0, sizeof(uint32_t) * 2} };
 
-    std::array descriptorSets = { context.defaultDescriptorSetLayout };
+    std::array descriptorSets = { context.defaultDescriptorSetLayout, context.lodDescriptorSetLayout };
     vk::PipelineLayoutCreateInfo pipelineLayoutCreate({}, descriptorSets, pushConsts);
     const auto pipelineLayout = context.device.createPipelineLayout(pipelineLayoutCreate);
     context.defaultPipelineLayout = pipelineLayout;
@@ -268,7 +274,7 @@ inline void createShaderPipelines(IContext& context) {
     const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
     const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
 
-    vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, context.defaultPipelineLayout);
+    vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, descriptorSets);
     const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
     if (result5.result != vk::Result::eSuccess)
         throw std::runtime_error("Pipeline error!");

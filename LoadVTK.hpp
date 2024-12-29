@@ -270,7 +270,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         currentOffset += sizesRequested[i];
     }
 
-    const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, context.defaultDescriptorSetLayout);
+    const std::array<vk::DescriptorSetLayout, 1 + LOD_COUNT> descriptorsToAllocate = { context.defaultDescriptorSetLayout, context.lodDescriptorSetLayout };
+    const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, descriptorsToAllocate);
     const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
     const vk::DescriptorBufferInfo descriptorCameraInfo(context.uniformCamera, 0, VK_WHOLE_SIZE);
     const vk::DescriptorBufferInfo descriptorVertexInfo(localBuffers[0], 0, VK_WHOLE_SIZE);
