@@ -59,6 +59,8 @@ enum class Heuristic {
 };
 
 using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 3>;
+using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 3>; 
+using VTKDescriptorArray = std::vector<vk::DescriptorSet>;
 
 struct VTKFile {
     size_t amountOfTetrahedrons;
@@ -66,7 +68,7 @@ struct VTKFile {
     VTKBufferArray bufferArray;
     vk::CommandPool sortSecondaryPool;
     vk::CommandBuffer sortSecondary;
-    vk::DescriptorSet descriptor;
+    VTKDescriptorArray descriptor;
     AABB aabb;
 
     void unload(IContext& context) {
@@ -240,22 +242,25 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer,
         vk::SharingMode::eExclusive, context.primaryFamilyIndex);
     VTKBufferArray localBuffers;
-    std::array<vk::DeviceSize, localBuffers.size()> sizesRequested = {vertexByteSize, tetrahedronByteSize,
+    VTKSizeArray sizesRequested = {vertexByteSize, tetrahedronByteSize,
                     sizeof(uint32_t) * tetrahedrons.size() };
-    const auto stateSize = (tetrahedrons.size() / sizeof(uint32_t) + 1) * sizeof(uint32_t);
+    const size_t stateSize = (tetrahedrons.size() / sizeof(uint32_t) + 1) * sizeof(uint32_t);
     for (size_t i = 3; i < LOD_COUNT + 3; i++) {
         sizesRequested[i] = stateSize;
         sizesRequested[i + LOD_COUNT] = levelToGenerate[i - 3].lodTetrahedrons.size() * sizeof(LODTetrahedron);
     }
     
+    VTKSizeArray sizesActual;
     size_t totalSizeRequested = 0;
     for (size_t i = 0; i < sizesRequested.size(); i++)
     {
         if(sizesRequested[i] == 0) continue;
         localBufferCreateInfo.size = sizesRequested[i];
         const auto localBuffer = context.device.createBuffer(localBufferCreateInfo);
-        const auto localSize = context.device.getBufferMemoryRequirements(localBuffer).size;
+        const auto requirements = context.device.getBufferMemoryRequirements(localBuffer);
+        const auto localSize = (requirements.size / requirements.alignment + 1) * requirements.alignment;
         totalSizeRequested += localSize;
+        sizesActual[i] = localSize;
         localBuffers[i] = localBuffer;
     }
 
@@ -267,10 +272,14 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     {
         if (sizesRequested[i] == 0) continue;
         context.device.bindBufferMemory(localBuffers[i], actualeMemory, currentOffset);
-        currentOffset += sizesRequested[i];
+        currentOffset += sizesActual[i];
     }
 
-    const std::array<vk::DescriptorSetLayout, 1 + LOD_COUNT> descriptorsToAllocate = { context.defaultDescriptorSetLayout, context.lodDescriptorSetLayout };
+    std::array<vk::DescriptorSetLayout, 1 + LOD_COUNT> descriptorsToAllocate = { context.defaultDescriptorSetLayout };
+    for (size_t i = 1; i < descriptorsToAllocate.size(); i++)
+    {
+        descriptorsToAllocate[i] = context.lodDescriptorSetLayout;
+    }
     const vk::DescriptorSetAllocateInfo allocateInfo(context.descriptorPool, descriptorsToAllocate);
     const auto descriptor = context.device.allocateDescriptorSets(allocateInfo);
     const vk::DescriptorBufferInfo descriptorCameraInfo(context.uniformCamera, 0, VK_WHOLE_SIZE);
@@ -284,6 +293,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::array writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets, writeSortIndexDescriptorSets };
     context.device.updateDescriptorSets(writeUpdateInfos, {});
 
+    const std::array descriptorsWithZeroLOD = {descriptor[0], descriptor[1]};
+
     auto [commandBuffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
     vk::CommandBufferBeginInfo beginInfo;
     commandBuffer.begin(beginInfo);
@@ -291,7 +302,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     commandBuffer.copyBuffer(stagingBuffer, localBuffers[0], copyBuffer);
     const vk::BufferCopy copyBufferIndex(vertexByteSize, 0, tetrahedronByteSize);
     commandBuffer.copyBuffer(stagingBuffer, localBuffers[1], copyBufferIndex);
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptor, {});
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsWithZeroLOD, {});
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeInitPipeline);
     commandBuffer.dispatch(1, 1, 1);
     commandBuffer.end();
@@ -308,12 +319,12 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     vk::CommandBufferInheritanceInfo inheritanceInfo(context.renderPass, 0);
     beginInfo.setPInheritanceInfo(&inheritanceInfo);
     buffer.begin(beginInfo);
-    buffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0u, descriptor, {});
+    buffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0u, descriptorsWithZeroLOD, {});
     buffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeSortPipeline);
     recordBitonicSort(tetrahedrons.size(), buffer, context, localBuffers[2]);
     buffer.end();
 
-    VTKFile file{ tetrahedrons.size(), actualeMemory, localBuffers, pool, buffer, descriptor[0], aabb};
+    VTKFile file{ tetrahedrons.size(), actualeMemory, localBuffers, pool, buffer, descriptor, aabb};
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     std::cout << "Loaded model: " << vtkFile << std::endl;
     if (result != vk::Result::eSuccess)

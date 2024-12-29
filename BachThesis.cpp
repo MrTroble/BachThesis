@@ -290,8 +290,8 @@ int main()
                 }
             }
             if (ImGui::CollapsingHeader("LOD")) {
+                ImGui::SliderFloat("Current LOD", &icontext.currentLOD, 0.0f, -0.1f + LOD_COUNT);
                 ImGui::Checkbox("Use LOD", &icontext.useLOD);
-                ImGui::SliderFloat("LOD", &icontext.currentLOD, 0, 5.0f);
             }
             ImGui::Checkbox("Sort primitives", &icontext.sortingOfPrimitives);
         }

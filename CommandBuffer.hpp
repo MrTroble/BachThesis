@@ -68,9 +68,11 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     const vk::Pipeline currentPipeline = getFromType(context.type, context);
     currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline);
 
+    const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
     for (const auto& vtk : vtkFiles)
     {
-        currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context.defaultPipelineLayout, 0, vtk.descriptor, {});
+        const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[lodToUse] };
+        currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context.defaultPipelineLayout, 0, descriptorsToUse, {});
         if (context.meshShader) {
             recordMeshPipeline(vtk, currentBuffer, context);
         }
@@ -274,7 +276,7 @@ inline void createShaderPipelines(IContext& context) {
     const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
     const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
 
-    vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, descriptorSets);
+    vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, pipelineLayout);
     const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
     if (result5.result != vk::Result::eSuccess)
         throw std::runtime_error("Pipeline error!");
