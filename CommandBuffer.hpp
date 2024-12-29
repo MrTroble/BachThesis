@@ -300,6 +300,7 @@ inline void destroyShaderPipelines(IContext& context) {
     }
     context.device.destroy(context.descriptorPool);
     context.device.destroy(context.defaultDescriptorSetLayout);
+    context.device.destroy(context.lodDescriptorSetLayout);
     context.device.destroy(context.defaultPipelineLayout);
     for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
     {
