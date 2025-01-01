@@ -33,6 +33,15 @@ layout (binding=2) buffer Vertex {
 layout(binding=3) buffer block {
     uint indexesToUse[];
 };
+layout(set=1,binding=1) buffer lodBlock {
+    uint visible[];
+};
+
+bool NotVisible(uint currentIndex) {
+    const uint index = currentIndex / 4;
+    const uint shift = (3 - (currentIndex % 4)) * 8;
+    return ((visible[index] >> shift) & 0xFF) == 0;
+}
 
 bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
     return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
@@ -55,7 +64,12 @@ void debugExit(uint code) {
 }
 
 void main() {
-    const uvec4 tetrahedron = index.data[indexesToUse[gl_WorkGroupID.x]];
+    const uint currentIndex = indexesToUse[gl_WorkGroupID.x];
+    if(NotVisible(currentIndex)) {
+        SetMeshOutputsEXT(0, 0);
+        return;
+    }
+    const uvec4 tetrahedron = index.data[currentIndex];
     const uint currentClass = gl_WorkGroupID.x % 3;
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
