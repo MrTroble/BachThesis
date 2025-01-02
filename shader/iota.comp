@@ -1,5 +1,7 @@
 #version 460
 
+layout(local_size_x = 128) in;
+
 layout(binding=3) buffer block {
     uint toSort[];
 };

@@ -2,6 +2,8 @@
 
 #define FLT_MAX 3.402823466e+38
 
+layout(local_size_x = 128) in;
+
 layout (binding=0) uniform Camera {
     mat4 model;
     mat4 view;

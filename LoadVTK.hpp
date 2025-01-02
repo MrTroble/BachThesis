@@ -50,13 +50,13 @@ constexpr std::array COLAPSING_PER_LEVEL = { 10u, 10u, 10u, 10u, 10u };
 enum class LodLevelFlag {
     None, L1, L2, L3
 };
-constexpr size_t LOD_COUNT = 3;
+constexpr size_t LOD_COUNT = 4;
 enum class Heuristic {
     Random
 };
 
-using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 3>;
-using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 3>;
+using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 2>;
+using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 2>;
 using VTKDescriptorArray = std::vector<vk::DescriptorSet>;
 
 struct VTKFile {
@@ -325,7 +325,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     for (size_t i = 0; i < LOD_COUNT - 1; i++)
     {
         const auto currentDescriptor = descriptor[2 + i];
-        const auto visibilityBuffer = localBuffers[4 + LOD_COUNT + i];
+        const auto visibilityBuffer = localBuffers[4 + i];
         if (visibilityBuffer) {
             auto& visibility = lodBufferInfos[i];
             visibility = vk::DescriptorBufferInfo{ visibilityBuffer, 0, VK_WHOLE_SIZE };
@@ -333,7 +333,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             writeUpdateInfos.push_back(writeVisibility);
         }
 
-        const auto dataBuffer = localBuffers[i + LOD_COUNT - 1];
+        const auto dataBuffer = localBuffers[i + LOD_COUNT + 4];
         if (dataBuffer) {
             auto& tetrahedrons = lodBufferInfos[i * 2];
             tetrahedrons = vk::DescriptorBufferInfo{ dataBuffer , 0, VK_WHOLE_SIZE };

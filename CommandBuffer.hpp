@@ -68,14 +68,15 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         for (const auto& vtk : vtkFiles)
         {
             bufferMemoryBarrier.buffer = vtk.bufferArray[0];
-            currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+            if(context.sortingOfPrimitives)
+                currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
             currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
             currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
-            currentBuffer.dispatch(vtk.lodAmount[nextLOD], 0, 0);
+            currentBuffer.dispatch(vtk.lodAmount[lodToUse - 1], 1, 1);
             buffersToWait.push_back(bufferMemoryBarrier);
         }
-        currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
+        currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
     }
 
 
