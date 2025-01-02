@@ -39,7 +39,7 @@ layout(set=1,binding=1) buffer lodBlock {
 
 bool NotVisible(uint currentIndex) {
     const uint index = currentIndex / 4;
-    const uint shift = (3 - (currentIndex % 4)) * 8;
+    const uint shift = (currentIndex % 4) * 8;
     return ((visible[index] >> shift) & 0xFF) == 0;
 }
 
