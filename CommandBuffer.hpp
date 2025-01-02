@@ -57,6 +57,27 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
             currentBuffer.executeCommands(vtk.sortSecondary);
         }
     }
+    
+    const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
+    if (context.useLOD) {
+        const auto flags = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+        vk::BufferMemoryBarrier bufferMemoryBarrier(flags, flags, context.primaryFamilyIndex, context.primaryFamilyIndex, VK_NULL_HANDLE, 0u, VK_WHOLE_SIZE);
+        std::vector<vk::BufferMemoryBarrier> buffersToWait;
+        buffersToWait.reserve(vtkFiles.size());
+        const size_t nextLOD = lodToUse + 1;
+        for (const auto& vtk : vtkFiles)
+        {
+            bufferMemoryBarrier.buffer = vtk.bufferArray[0];
+            currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+            const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
+            currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
+            currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
+            currentBuffer.dispatch(vtk.lodAmount[nextLOD], 0, 0);
+            buffersToWait.push_back(bufferMemoryBarrier);
+        }
+        currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
+    }
+
 
     const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };
     const vk::ClearColorValue blackValue{ 0.0f, 0.0f, 0.0f, 1.0f };
@@ -68,7 +89,6 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     const vk::Pipeline currentPipeline = getFromType(context.type, context);
     currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline);
 
-    const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
     for (const auto& vtk : vtkFiles)
     {
         const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[lodToUse] };
@@ -140,7 +160,7 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv"};
     const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -275,6 +295,7 @@ inline void createShaderPipelines(IContext& context) {
 
     const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
     const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
+    const auto lodPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["lod.comp.spv"], "main" };
 
     vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, pipelineLayout);
     const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
@@ -286,6 +307,11 @@ inline void createShaderPipelines(IContext& context) {
     if (result6.result != vk::Result::eSuccess)
         throw std::runtime_error("Pipeline error!");
     context.computeSortPipeline = result6.value;
+    computePipeCreateInfo.setStage(lodPipelineShaderStages);
+    const auto result7 = context.device.createComputePipeline({}, computePipeCreateInfo);
+    if (result7.result != vk::Result::eSuccess)
+        throw std::runtime_error("Pipeline error!");
+    context.computeLODPipeline = result7.value;
 
     const vk::DescriptorPoolSize poolStorageSize(vk::DescriptorType::eStorageBuffer, 3000);
     const vk::DescriptorPoolSize poolUniformSize(vk::DescriptorType::eUniformBuffer, 1000);
@@ -310,6 +336,7 @@ inline void destroyShaderPipelines(IContext& context) {
     }
     context.device.destroy(context.computeInitPipeline);
     context.device.destroy(context.computeSortPipeline);
+    context.device.destroy(context.computeLODPipeline);
 }
 
 struct CameraInfo {
@@ -319,6 +346,7 @@ struct CameraInfo {
     glm::mat4 whole;
     glm::mat4 inverse;
     glm::vec4 colorADepth;
+    float lod;
 };
 
 inline void updateCamera(IContext& context) {
@@ -335,6 +363,7 @@ inline void updateCamera(IContext& context) {
     cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
     cameraMap->inverse = glm::inverse(projectionMatrix * cameraMap->view);
     cameraMap->colorADepth = context.colorADepth;
+    cameraMap->lod = context.currentLOD;
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

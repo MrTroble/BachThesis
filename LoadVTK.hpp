@@ -36,8 +36,8 @@ inline AABB extendAABB(const AABB& aabb1, const AABB& aabb2) {
 }
 
 struct LODTetrahedron {
-    float previous[4];
-    float next;
+    glm::vec4 previous[4];
+    glm::vec4 next;
     TetIndex tetrahedron;
 };
 
@@ -67,6 +67,7 @@ struct VTKFile {
     vk::CommandBuffer sortSecondary;
     VTKDescriptorArray descriptor;
     AABB aabb;
+    std::vector<size_t> lodAmount;
 
     void unload(IContext& context) {
         context.device.freeMemory(memory);
@@ -89,7 +90,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     uint32_t j, k;
     const auto flags = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
     vk::BufferMemoryBarrier bufferMemoryBarrier(flags, flags, context.primaryFamilyIndex, context.primaryFamilyIndex, sortBuffer, 0u, VK_WHOLE_SIZE);
-    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
     for (k = 2; k <= N; k = 2 * k) {
         for (j = k >> 1; j > 0; j = j >> 1) {
             std::array values = { k, j };
@@ -98,7 +99,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
             buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
         }
     }
-    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
 }
 
 
@@ -117,10 +118,27 @@ inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
     return level;
 }
 
-LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const TetGraph& graph) {
+LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const TetGraph& graph, const std::vector<glm::vec4>& vertices,
+    const std::vector<Tetrahedron>& tetrahedrons) {
+
     LODLevel level;
     level.usageAfter.resize(graph.size(), true);
     level.lodTetrahedrons.resize(1);
+    
+    const auto preyIndex = 0u;
+    const auto& prey = tetrahedrons[preyIndex];
+    auto& lodInfo = level.lodTetrahedrons[preyIndex];
+    lodInfo.tetrahedron = preyIndex;
+    glm::vec4 all(0);
+    for (size_t i = 0; i < 4; i++)
+    {
+        const auto currentPoint = vertices[prey.indices[i]];
+        lodInfo.previous[i] = currentPoint;
+        all += currentPoint;
+    }
+    // Barycentric middle
+    lodInfo.next = all / 4.0f;
+    level.usageAfter[0] = 0;
     return level;
 }
 
@@ -210,13 +228,13 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     std::array<LODLevel, LOD_COUNT> levelToGenerate;
     levelToGenerate[0] = defaultLODLevel(context, tetrahedronGraph);
     const size_t stateSize = (tetrahedrons.size() / sizeof(uint32_t) + 1) * sizeof(uint32_t);
-    size_t additionalDataSize = LOD_COUNT*stateSize;
+    size_t additionalDataSize = LOD_COUNT * stateSize;
     for (size_t i = 1; i < LOD_COUNT; i++)
     {
         LODGenerateInfo generateInfo{
             levelToGenerate[i - 1].usageAfter, allowedToTake, tetrahedronGraph, context,
             (LodLevelFlag)i, Heuristic::Random };
-        levelToGenerate[i] = loadLODLevel(generateInfo, tetrahedronGraph);
+        levelToGenerate[i] = loadLODLevel(generateInfo, tetrahedronGraph, vertices, tetrahedrons);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);
     }
 
@@ -232,12 +250,12 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const auto stagingMemory = context.requestMemory(memoryRequirementsStaging.size,
         vk::MemoryPropertyFlagBits::eHostVisible);
     const ScopeExit cleanStagingMemory([&]() { context.device.freeMemory(stagingMemory); });
-    
+
     void* mapped = context.device.mapMemory(stagingMemory, 0, VK_WHOLE_SIZE);
     std::copy(vertices.begin(), vertices.end(), (glm::vec4*)mapped);
     std::copy(tetrahedrons.begin(), tetrahedrons.end(), (Tetrahedron*)((char*)mapped + vertexByteSize));
     char* nextPointer = ((char*)mapped + vertexByteSize + tetrahedronByteSize);
-    LODTetrahedron* nextPointerData = (LODTetrahedron*)(nextPointer + LOD_COUNT*stateSize);
+    LODTetrahedron* nextPointerData = (LODTetrahedron*)(nextPointer + LOD_COUNT * stateSize);
     for (const auto& lod : levelToGenerate) {
         std::copy(lod.usageAfter.begin(), lod.usageAfter.end(), nextPointer);
         std::copy(lod.lodTetrahedrons.begin(), lod.lodTetrahedrons.end(), nextPointerData);
@@ -336,7 +354,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     commandBuffer.copyBuffer(stagingBuffer, localBuffers[1], copyBufferIndex);
 
     vk::BufferCopy copyVisibility(tetrahedronByteSize + vertexByteSize, 0, stateSize);
-    vk::BufferCopy copyLODData(tetrahedronByteSize + vertexByteSize + LOD_COUNT*stateSize);
+    vk::BufferCopy copyLODData(tetrahedronByteSize + vertexByteSize + LOD_COUNT * stateSize);
     size_t visible = 0;
     for (const auto& lod : levelToGenerate) {
         commandBuffer.copyBuffer(stagingBuffer, localBuffers[3 + visible], copyVisibility);
@@ -372,6 +390,10 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     buffer.end();
 
     VTKFile file{ tetrahedrons.size(), actualeMemory, localBuffers, pool, buffer, descriptor, aabb };
+    for (const auto& level : levelToGenerate)
+    {
+        file.lodAmount.push_back(level.lodTetrahedrons.size());
+    }
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     std::cout << "Loaded model: " << vtkFile << std::endl;
     if (result != vk::Result::eSuccess)

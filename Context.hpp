@@ -83,6 +83,7 @@ struct IContext {
     vk::Pipeline colorPipeline;
     vk::Pipeline computeInitPipeline;
     vk::Pipeline computeSortPipeline;
+    vk::Pipeline computeLODPipeline;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;

@@ -1,0 +1,38 @@
+#version 460
+
+#define FLT_MAX 3.402823466e+38
+
+layout (binding=0) uniform Camera {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 whole;
+    mat4 inverseM;
+    vec4 colorDepth;
+    float lod;
+} camera;
+layout (binding=1) buffer Index {
+    uvec4 data[];
+} index;
+
+layout (binding=2) buffer Vertex {
+    vec4 vertexData[];
+};
+
+struct LODInfo {
+    vec4 previous[4];
+    vec4 next;
+    uint tetrahedron;
+};
+
+layout (set=1, binding=0) buffer LOD {
+    LODInfo lodData[];
+};
+
+void main() {
+   LODInfo info = lodData[gl_WorkGroupID.x];
+   uvec4 tetrahedron = index.data[info.tetrahedron];
+   for(uint x = 0; x < 4; x++) {
+        vertexData[tetrahedron[x]] = mix(info.next, info.previous[x], camera.lod);
+   }
+}
