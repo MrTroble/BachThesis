@@ -35,6 +35,6 @@ void main() {
    LODInfo info = lodData[gl_WorkGroupID.x];
    uvec4 tetrahedron = index.data[info.tetrahedron];
    for(uint x = 0; x < 4; x++) {
-        vertexData[tetrahedron[x]] = mix(info.next, info.previous[x], camera.lod);
+        vertexData[tetrahedron[x]] = mix(info.previous[x], info.next, camera.lod);
    }
 }

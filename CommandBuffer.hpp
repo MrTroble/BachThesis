@@ -73,7 +73,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
             currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
             currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
-            currentBuffer.dispatch(vtk.lodAmount[lodToUse - 1], 1, 1);
+            currentBuffer.dispatch(vtk.lodAmount[lodToUse], 1, 1);
             buffersToWait.push_back(bufferMemoryBarrier);
         }
         currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
@@ -364,7 +364,7 @@ inline void updateCamera(IContext& context) {
     cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
     cameraMap->inverse = glm::inverse(projectionMatrix * cameraMap->view);
     cameraMap->colorADepth = context.colorADepth;
-    cameraMap->lod = context.currentLOD;
+    cameraMap->lod = context.currentLOD - ((uint32_t)context.currentLOD);
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
