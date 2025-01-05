@@ -140,7 +140,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
     {
         if(level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
             break;
-        if(!level.usageAfter[i] || lodGenerateInfo.outer[i])
+        if(!level.usageAfter[i] || !lodGenerateInfo.outer[i])
             continue;
         const auto preyIndex = i;
         const auto& prey = tetrahedrons[preyIndex];
@@ -158,14 +158,13 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
         level.usageAfter[preyIndex] = 0;
         for (const auto [connecting, type] : lodGenerateInfo.graph[preyIndex])
         {   
-            if(type != EdgeType::Point) continue;
+            if(type == EdgeType::Point) continue;
             level.usageAfter[connecting] = 0;
         }
     }
     if (level.lodTetrahedrons.empty()) {
         std::cout << "Warning: No preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
-    }
-    if (level.lodTetrahedrons.size() < COLAPSING_PER_LEVEL) {
+    } else if (level.lodTetrahedrons.size() < COLAPSING_PER_LEVEL) {
         std::cout << "Warning: Not enough preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
     }
     return level;
@@ -236,6 +235,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         currentIndex++;
     }
 
+    static constexpr size_t SIDES_PER_TETRAHEDRON = 4;
     std::vector<char> allowedToTake(tetrahedrons.size(), true);
     // Finding outer tetrahedron and their direct neighbours
     // Do not use as prey -> 3.4 Boundary preservation tests
@@ -245,11 +245,12 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         size_t amount = 0;
         for (const auto& [other, type] : connected) {
             if (type == EdgeType::Face) amount++;
-            if (amount == 3) break;
+            if (amount == SIDES_PER_TETRAHEDRON) break;
         }
-        if (amount == 3) continue;
+        if (amount == SIDES_PER_TETRAHEDRON) continue;
         allowedToTake[i] = false;
         for (const auto& [other, type] : connected) {
+            if(type == EdgeType::Point) continue;
             allowedToTake[other] = false;
         }
     }
