@@ -45,7 +45,7 @@ struct LODLevel {
     std::vector<LODTetrahedron> lodTetrahedrons;
     std::vector<char> usageAfter;
 };
-constexpr std::array COLAPSING_PER_LEVEL = { 10u, 10u, 10u, 10u, 10u };
+constexpr size_t COLAPSING_PER_LEVEL = 10u;
 
 enum class LodLevelFlag {
     None, L1, L2, L3
@@ -54,6 +54,17 @@ constexpr size_t LOD_COUNT = 4;
 enum class Heuristic {
     Random
 };
+inline std::string stringLODLevel(const LodLevelFlag flag) {
+    switch (flag)
+    {
+    case LodLevelFlag::None: return "None";
+    case LodLevelFlag::L1: return "L1";
+    case LodLevelFlag::L2: return "L2";
+    case LodLevelFlag::L3: return "L3";
+    default:
+        throw std::runtime_error("Wrong LODLevelFlag!");
+    }
+}
 
 using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 2>;
 using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 2>;
@@ -110,6 +121,7 @@ struct LODGenerateInfo {
     IContext& context;
     LodLevelFlag level;
     Heuristic heuristic;
+    std::string name;
 };
 
 inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
@@ -118,27 +130,44 @@ inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
     return level;
 }
 
-LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const TetGraph& graph, const std::vector<glm::vec4>& vertices,
+inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::vector<glm::vec4>& vertices,
     const std::vector<Tetrahedron>& tetrahedrons) {
 
     LODLevel level;
-    level.usageAfter.resize(graph.size(), true);
-    level.lodTetrahedrons.resize(1);
+    level.usageAfter = lodGenerateInfo.previous;
     
-    const auto preyIndex = 0u;
-    const auto& prey = tetrahedrons[preyIndex];
-    auto& lodInfo = level.lodTetrahedrons[preyIndex];
-    lodInfo.tetrahedron = preyIndex;
-    glm::vec4 all(0);
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < lodGenerateInfo.graph.size(); i++)
     {
-        const auto currentPoint = vertices[prey.indices[i]];
-        lodInfo.previous[i] = currentPoint;
-        all += currentPoint;
+        if(level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
+            break;
+        if(!level.usageAfter[i] || lodGenerateInfo.outer[i])
+            continue;
+        const auto preyIndex = i;
+        const auto& prey = tetrahedrons[preyIndex];
+        auto& lodInfo = level.lodTetrahedrons.emplace_back();
+        lodInfo.tetrahedron = preyIndex;
+        glm::vec4 all(0);
+        for (size_t i = 0; i < 4; i++)
+        {
+            const auto currentPoint = vertices[prey.indices[i]];
+            lodInfo.previous[i] = currentPoint;
+            all += currentPoint;
+        }
+        // Barycentric middle
+        lodInfo.next = all / 4.0f;
+        level.usageAfter[preyIndex] = 0;
+        for (const auto [connecting, type] : lodGenerateInfo.graph[preyIndex])
+        {   
+            if(type != EdgeType::Point) continue;
+            level.usageAfter[connecting] = 0;
+        }
     }
-    // Barycentric middle
-    lodInfo.next = all / 4.0f;
-    level.usageAfter[0] = 0;
+    if (level.lodTetrahedrons.empty()) {
+        std::cout << "Warning: No preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
+    }
+    if (level.lodTetrahedrons.size() < COLAPSING_PER_LEVEL) {
+        std::cout << "Warning: Not enough preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
+    }
     return level;
 }
 
@@ -233,8 +262,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     {
         LODGenerateInfo generateInfo{
             levelToGenerate[i - 1].usageAfter, allowedToTake, tetrahedronGraph, context,
-            (LodLevelFlag)i, Heuristic::Random };
-        levelToGenerate[i] = loadLODLevel(generateInfo, tetrahedronGraph, vertices, tetrahedrons);
+            (LodLevelFlag)i, Heuristic::Random, vtkFile };
+        levelToGenerate[i] = loadLODLevel(generateInfo, vertices, tetrahedrons);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);
     }
 

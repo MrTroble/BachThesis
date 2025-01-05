@@ -67,13 +67,15 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         const size_t nextLOD = lodToUse + 1;
         for (const auto& vtk : vtkFiles)
         {
+            const auto lodAmount = vtk.lodAmount[lodToUse];
+            if(lodAmount == 0) continue;
             bufferMemoryBarrier.buffer = vtk.bufferArray[0];
             if(context.sortingOfPrimitives)
                 currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
             currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
             currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
-            currentBuffer.dispatch(vtk.lodAmount[lodToUse], 1, 1);
+            currentBuffer.dispatch(lodAmount, 1, 1);
             buffersToWait.push_back(bufferMemoryBarrier);
         }
         currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
