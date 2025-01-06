@@ -135,36 +135,77 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
 
     LODLevel level;
     level.usageAfter = lodGenerateInfo.previous;
-    
+
     for (size_t i = 0; i < lodGenerateInfo.graph.size(); i++)
     {
-        if(level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
+        if (level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
             break;
-        if(!level.usageAfter[i] || !lodGenerateInfo.outer[i])
+        if (!level.usageAfter[i] || !lodGenerateInfo.outer[i])
             continue;
         const auto preyIndex = i;
+        const auto& neighbours = lodGenerateInfo.graph[preyIndex];
         const auto& prey = tetrahedrons[preyIndex];
+        // Barycentric middle
+        glm::vec4 all(0);
+        for (size_t i = 0; i < 4; i++)
+        {
+            all += vertices[prey.indices[i]];
+        }
+        all /= 4.0f;
+        const glm::vec3 midPoint = all;
+        const std::span preySpan = prey.indices;
+        bool flipping = false;
+        for (const auto& [connecting, type] : neighbours)
+        {
+            if (type != EdgeType::Point) continue;
+            const auto& other = tetrahedrons[connecting];
+            std::array<VertIndex, 3> usedForPlane;
+            size_t amountFound = 0;
+            VertIndex otherPoint;
+            for (size_t i = 0; i < 4; i++)
+            {
+                const auto index = other.indices[i];
+                if (std::ranges::find(preySpan, index) != preySpan.end()) {
+                    otherPoint = index;
+                    continue;
+                }
+                usedForPlane[amountFound++] = index;
+            }
+            assert(amountFound == 3);
+            // Test plane for flips
+            const auto& point2 = vertices[usedForPlane[0]];
+            const glm::vec3 v0 = vertices[usedForPlane[1]] - point2;
+            const glm::vec3 v1 = vertices[usedForPlane[2]] - point2;
+            const auto planeNormal = glm::normalize(glm::cross(v0, v1));
+            const glm::vec3 oldVertex = vertices[otherPoint];
+            const auto signOld = glm::sign(glm::dot(planeNormal, oldVertex));
+            const auto signNew = glm::sign(glm::dot(planeNormal, midPoint));
+            if (signOld != signNew) {
+                flipping = true;
+                break;
+            }
+        }
+        if(flipping) continue;
+
         auto& lodInfo = level.lodTetrahedrons.emplace_back();
         lodInfo.tetrahedron = preyIndex;
-        glm::vec4 all(0);
         for (size_t i = 0; i < 4; i++)
         {
             const auto currentPoint = vertices[prey.indices[i]];
             lodInfo.previous[i] = currentPoint;
-            all += currentPoint;
         }
-        // Barycentric middle
-        lodInfo.next = all / 4.0f;
+        lodInfo.next = all;
         level.usageAfter[preyIndex] = 0;
-        for (const auto [connecting, type] : lodGenerateInfo.graph[preyIndex])
-        {   
-            if(type == EdgeType::Point) continue;
+        for (const auto& [connecting, type] : neighbours)
+        {
+            if (type == EdgeType::Point) continue;
             level.usageAfter[connecting] = 0;
         }
     }
     if (level.lodTetrahedrons.empty()) {
         std::cout << "Warning: No preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
-    } else if (level.lodTetrahedrons.size() < COLAPSING_PER_LEVEL) {
+    }
+    else if (level.lodTetrahedrons.size() < COLAPSING_PER_LEVEL) {
         std::cout << "Warning: Not enough preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
     }
     return level;
@@ -217,6 +258,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     for (const auto& tet : tetrahedrons)
     {
         currentTetValues.clear();
+
         for (size_t i = 0; i < 4; i++)
         {
             const auto value = tet.indices[i];
@@ -250,7 +292,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         if (amount == SIDES_PER_TETRAHEDRON) continue;
         allowedToTake[i] = false;
         for (const auto& [other, type] : connected) {
-            if(type == EdgeType::Point) continue;
+            if (type == EdgeType::Point) continue;
             allowedToTake[other] = false;
         }
     }
