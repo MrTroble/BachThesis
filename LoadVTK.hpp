@@ -407,7 +407,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
         const auto dataBuffer = localBuffers[i + LOD_COUNT + 4];
         if (dataBuffer) {
-            auto& tetrahedrons = lodBufferInfos[i * 2];
+            auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT - 1];
             tetrahedrons = vk::DescriptorBufferInfo{ dataBuffer , 0, VK_WHOLE_SIZE };
             const vk::WriteDescriptorSet writeData(currentDescriptor, 0, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
             writeUpdateInfos.push_back(writeData);
