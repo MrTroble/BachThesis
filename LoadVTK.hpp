@@ -38,7 +38,7 @@ inline AABB extendAABB(const AABB& aabb1, const AABB& aabb2) {
 struct LODTetrahedron {
     glm::vec4 previous[4];
     glm::vec4 next;
-    TetIndex tetrahedron;
+    Tetrahedron tetrahedron;
 };
 
 struct LODLevel {
@@ -101,7 +101,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
     uint32_t j, k;
     const auto flags = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
     vk::BufferMemoryBarrier bufferMemoryBarrier(flags, flags, context.primaryFamilyIndex, context.primaryFamilyIndex, sortBuffer, 0u, VK_WHOLE_SIZE);
-    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
+    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
     for (k = 2; k <= N; k = 2 * k) {
         for (j = k >> 1; j > 0; j = j >> 1) {
             std::array values = { k, j };
@@ -188,7 +188,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
         if(flipping) continue;
 
         auto& lodInfo = level.lodTetrahedrons.emplace_back();
-        lodInfo.tetrahedron = preyIndex;
+        lodInfo.tetrahedron = tetrahedrons[preyIndex];
         for (size_t i = 0; i < 4; i++)
         {
             const auto currentPoint = vertices[prey.indices[i]];

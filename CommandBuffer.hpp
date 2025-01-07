@@ -60,25 +60,16 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     
     const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
     if (context.useLOD) {
-        const auto flags = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
-        vk::BufferMemoryBarrier bufferMemoryBarrier(flags, flags, context.primaryFamilyIndex, context.primaryFamilyIndex, VK_NULL_HANDLE, 0u, VK_WHOLE_SIZE);
-        std::vector<vk::BufferMemoryBarrier> buffersToWait;
-        buffersToWait.reserve(vtkFiles.size());
         const size_t nextLOD = lodToUse + 1;
         for (const auto& vtk : vtkFiles)
         {
             const auto lodAmount = vtk.lodAmount[lodToUse];
             if(lodAmount == 0) continue;
-            bufferMemoryBarrier.buffer = vtk.bufferArray[0];
-            if(context.sortingOfPrimitives)
-                currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eDeviceGroup, {}, { bufferMemoryBarrier }, {});
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
             currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
             currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
             currentBuffer.dispatch(lodAmount, 1, 1);
-            buffersToWait.push_back(bufferMemoryBarrier);
         }
-        currentBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eAllGraphics, vk::DependencyFlagBits::eDeviceGroup, {}, buffersToWait, {});
     }
 
 

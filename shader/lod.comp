@@ -24,7 +24,7 @@ layout (binding=2) buffer Vertex {
 struct LODInfo {
     vec4 previous[4];
     vec4 next;
-    uint tetrahedron;
+    uvec4 tetrahedron;
 };
 
 layout (set=1, binding=0) buffer LOD {
@@ -33,8 +33,7 @@ layout (set=1, binding=0) buffer LOD {
 
 void main() {
    LODInfo info = lodData[gl_WorkGroupID.x];
-   uvec4 tetrahedron = index.data[info.tetrahedron];
    for(uint x = 0; x < 4; x++) {
-        vertexData[tetrahedron[x]] = mix(info.previous[x], info.next, camera.lod);
+        vertexData[info.tetrahedron[x]] = mix(info.previous[x], info.next, camera.lod);
    }
 }
