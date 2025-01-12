@@ -197,9 +197,8 @@ int main()
     }
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk"
-        //,"Armadillo.vtk"
-    };
+    const auto startTimeLoading = std::chrono::steady_clock::now();
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "Armadillo.vtk"};
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
         loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));
@@ -209,10 +208,13 @@ int main()
     active.resize(loadedVtkFiles.size(), false);
     active[0] = true;
     const ScopeExit cleanCrystal([&]() { for (auto& file : loadedVtkFiles) file.unload(icontext); });
-    
+    const auto endTimeLoading = std::chrono::steady_clock::now();
+    const auto durationLoading = std::chrono::duration_cast<std::chrono::nanoseconds>(endTimeLoading - startTimeLoading);
+    std::cout << "Loading time " << durationLoading.count() / (1e6f) << std::endl;
+
     int64_t currentValue = 0;
     std::deque<float> smoothing;
-    constexpr size_t MAX_SMOOTH = 2000;
+    constexpr size_t MAX_SMOOTH = 1000;
 
     while (!glfwWindowShouldClose(icontext.window))
     {

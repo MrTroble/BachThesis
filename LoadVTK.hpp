@@ -45,7 +45,7 @@ struct LODLevel {
     std::vector<LODTetrahedron> lodTetrahedrons;
     std::vector<char> usageAfter;
 };
-constexpr size_t COLAPSING_PER_LEVEL = 10u;
+constexpr size_t COLAPSING_PER_LEVEL = 100u;
 
 enum class LodLevelFlag {
     None, L1, L2, L3
@@ -218,6 +218,8 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     std::vector<glm::vec4> vertices;
     std::vector<Tetrahedron> tetrahedrons;
+    vertices.reserve(2048);
+    vertices.reserve(4096);
 
     AABB aabb;
     while (!valueVTK.eof() && valueVTK)
@@ -253,11 +255,16 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     TetGraph tetrahedronGraph(tetrahedrons.size());
     for (auto& vec : tetrahedronGraph) vec.reserve(64);
-    thread_local std::unordered_map<TetIndex, size_t> currentTetValues;
+    std::vector<uint8_t> currentTetValues(tetrahedrons.size());
+    std::vector<TetIndex> addedValues;
+    addedValues.reserve(64);
     size_t currentIndex = 0;
     for (const auto& tet : tetrahedrons)
     {
-        currentTetValues.clear();
+        addedValues.clear();
+        for (const auto dirtyValue : addedValues) {
+            currentTetValues[dirtyValue] = 0;
+        }
 
         for (size_t i = 0; i < 4; i++)
         {
@@ -265,11 +272,14 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             const auto& connected = vertexConnection[value];
             for (const auto otherTetIndex : connected) {
                 if (otherTetIndex == currentIndex) continue;
-                currentTetValues[otherTetIndex]++;
+                const auto oldValue = currentTetValues[otherTetIndex];
+                if(oldValue == 0) addedValues.push_back(otherTetIndex);
+                currentTetValues[otherTetIndex] = oldValue + 1;
             }
         }
-        for (const auto& [index, amount] : currentTetValues)
+        for (const auto index : addedValues)
         {
+            const auto amount = currentTetValues[index];
             assert(amount < 4);
             auto& edgeList = tetrahedronGraph[currentIndex];
             edgeList.emplace_back(index, (EdgeType)amount);
