@@ -10,38 +10,13 @@ layout (local_size_x=128) in;
 layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
-// Debug Out
-layout(location=1) perprimitiveEXT out flat uint workGroupID[];
+// Task shader input
+taskPayloadSharedEXT vec4 pointsToUse[4];
+
+// Color out
 layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
 // Depth output
 layout(location=0) out vec4 depthsMinMax[];
-
-layout (binding=0) uniform Camera {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-    mat4 whole;
-    mat4 inverseM;
-    vec4 colorDepth;
-} camera;
-layout (binding=1) buffer Index {
-    uvec4 data[];
-} index;
-layout (binding=2) buffer Vertex {
-    vec4 vertexData[];
-} vertex;
-layout(binding=3) buffer block {
-    uint indexesToUse[];
-};
-layout(set=1,binding=1) buffer lodBlock {
-    uint visible[];
-};
-
-bool NotVisible(uint currentIndex) {
-    const uint index = currentIndex / 4;
-    const uint shift = (currentIndex % 4) * 8;
-    return ((visible[index] >> shift) & 0xFF) == 0;
-}
 
 bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
     return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
@@ -58,18 +33,7 @@ float distToLine(vec2 l1, vec2 l2, vec2 p) {
     return abs(aboveLine(l1, l2, p));
 }
 
-void debugExit(uint code) {
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, code);
-    SetMeshOutputsEXT(3, 1);
-}
-
 void main() {
-    const uint currentIndex = indexesToUse[gl_WorkGroupID.x];
-    if(NotVisible(currentIndex)) {
-        SetMeshOutputsEXT(0, 0);
-        return;
-    }
-    const uvec4 tetrahedron = index.data[currentIndex];
     const uint currentClass = gl_WorkGroupID.x % 3;
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
@@ -80,17 +44,12 @@ void main() {
     float currentX = FLT_MAX;
     uint mostRight = 0;
     float currentXRight = -FLT_MAX;
-    bool allNot = false;
     for(uint x = 0; x < 4; x++) {
-        vec4 world = camera.model * vertex.vertexData[tetrahedron[x]];
-        vec4 screen = camera.view * world;
-        vec4 projection = camera.proj * screen;
+        vec4 projection = pointsToUse[x];
         vec2 screen2D = projection.xy / projection.w;
         gl_MeshVerticesEXT[x].gl_Position = vec4(screen2D, 0.0f, 1.0f);
         screenSpace[x] = screen2D;
         projectionDepths[x] = projection / projection.w;
-        if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
-            allNot = true;
         if(currentX > screen2D.x) {
             mostLeft = x;
             currentX = screen2D.x;
@@ -99,12 +58,6 @@ void main() {
             mostRight = x;
             currentXRight = screen2D.x;
         }
-    }
-
-    // Clipping
-    if(!allNot) {
-        SetMeshOutputsEXT(0, 0);
-        return;
     }
     
     float distanceToLine = 0;
@@ -198,12 +151,6 @@ void main() {
         lambdasOut[2] = primColorOut;
         lambdasOut[3] = primColorOut;
 
-        uint currentID = indexesToUse[gl_WorkGroupID.x];
-        workGroupID[0] = currentID;
-        workGroupID[1] = currentID;
-        workGroupID[2] = currentID;
-        workGroupID[3] = currentID;
-
         depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
         SetMeshOutputsEXT(5, 4);
@@ -229,11 +176,6 @@ void main() {
         lambdasOut[0] = primColorOut;
         lambdasOut[1] = primColorOut;
         lambdasOut[2] = primColorOut;
-
-        uint currentID = indexesToUse[gl_WorkGroupID.x];
-        workGroupID[0] = currentID;
-        workGroupID[1] = currentID;
-        workGroupID[2] = currentID;
 
         SetMeshOutputsEXT(4, 3);
     }

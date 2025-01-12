@@ -57,14 +57,14 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
             currentBuffer.executeCommands(vtk.sortSecondary);
         }
     }
-    
+
     const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
     if (context.useLOD) {
         const size_t nextLOD = lodToUse + 1;
         for (const auto& vtk : vtkFiles)
         {
             const auto lodAmount = vtk.lodAmount[lodToUse];
-            if(lodAmount == 0) continue;
+            if (lodAmount == 0) continue;
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
             currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
             currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODPipeline);
@@ -154,8 +154,8 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv"};
-    const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv" };
+    const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv", "dispatch.task.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
     }
@@ -183,12 +183,14 @@ inline void recreatePipeline(IContext& context) {
 
     std::array proxyPipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["debug.frag.spv"], "main"},
-    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eTaskEXT, context.shaderModule["dispatch.task.spv"], "main"}
     };
 
     std::array colorPipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["color.frag.spv"], "main"},
-    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"}
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eTaskEXT, context.shaderModule["dispatch.task.spv"], "main"}
     };
 
     vk::Rect2D rect2d{ {0,0}, context.currentExtent };
@@ -254,7 +256,7 @@ inline void recreatePipeline(IContext& context) {
 inline void createShaderPipelines(IContext& context) {
     loadAndAdd(context);
 
-    vk::ShaderStageFlags flagBitsForBindings = context.meshShader ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+    vk::ShaderStageFlags flagBitsForBindings = context.meshShader ? (vk::ShaderStageFlagBits::eMeshEXT | vk::ShaderStageFlagBits::eTaskEXT) : vk::ShaderStageFlagBits::eVertex;
     flagBitsForBindings |= vk::ShaderStageFlagBits::eFragment;
     flagBitsForBindings |= vk::ShaderStageFlagBits::eCompute;
 

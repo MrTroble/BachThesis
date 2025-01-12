@@ -1,0 +1,69 @@
+#version 460
+
+#extension GL_EXT_mesh_shader : require
+
+#define FLT_MAX 3.402823466e+38
+#define FLT_MIN 1.175494351e-38
+
+layout (local_size_x=128) in;
+
+// Tetrahedron output
+taskPayloadSharedEXT vec4 pointsToUse[4];
+
+layout (binding=0) uniform Camera {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 whole;
+    mat4 inverseM;
+    vec4 colorDepth;
+} camera;
+layout (binding=1) buffer Index {
+    uvec4 data[];
+} index;
+layout (binding=2) buffer Vertex {
+    vec4 vertexData[];
+} vertex;
+layout(binding=3) buffer block {
+    uint indexesToUse[];
+};
+layout(set=1,binding=1) buffer lodBlock {
+    uint visible[];
+};
+
+bool NotVisible(uint currentIndex) {
+    const uint index = currentIndex / 4;
+    const uint shift = (currentIndex % 4) * 8;
+    return ((visible[index] >> shift) & 0xFF) == 0;
+}
+
+void main() {
+    const uint currentIndex = indexesToUse[gl_WorkGroupID.x];
+    if(NotVisible(currentIndex)) {
+        EmitMeshTasksEXT(0, 0, 0);
+        return;
+    }
+    const uvec4 tetrahedron = index.data[currentIndex];
+    // Manually unroll
+    pointsToUse[0] = camera.whole * vertex.vertexData[tetrahedron[0]];
+    pointsToUse[0] /= pointsToUse[0].w;
+    pointsToUse[1] = camera.whole * vertex.vertexData[tetrahedron[1]];
+    pointsToUse[1] /= pointsToUse[1].w;
+    pointsToUse[2] = camera.whole * vertex.vertexData[tetrahedron[2]];
+    pointsToUse[2] /= pointsToUse[2].w;
+    pointsToUse[3] = camera.whole * vertex.vertexData[tetrahedron[3]];
+    pointsToUse[3] /= pointsToUse[3].w;
+    
+    // Clipping
+    bool allNot = false;
+    for(uint x = 0; x < 4; x++) {
+        const vec4 screen2D = pointsToUse[x];
+        if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
+            allNot = true;
+    }
+    if(!allNot) {
+        EmitMeshTasksEXT(0, 0, 0);
+        return;
+    }
+    EmitMeshTasksEXT(1, 1, 1);
+}
