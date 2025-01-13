@@ -18,10 +18,6 @@ layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
 // Depth output
 layout(location=0) out vec4 depthsMinMax[];
 
-bool onAABB(vec2 p, vec2 minAABB, vec2 maxAABB) {
-    return minAABB.x == p.x || maxAABB.x == p.x || minAABB.y == p.y || maxAABB.y == p.y;
-}
-
 float aboveLine(vec2 l1, vec2 l2, vec2 p) {
     vec2 Md = l2 - l1;
     vec2 n = vec2(Md.y, -Md.x);
@@ -38,25 +34,20 @@ void main() {
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
     
-    vec4 projectionDepths[4];
-    vec2 screenSpace[4];
     uint mostLeft = 0;
     float currentX = FLT_MAX;
     uint mostRight = 0;
     float currentXRight = -FLT_MAX;
     for(uint x = 0; x < 4; x++) {
-        vec4 projection = pointsToUse[x];
-        vec2 screen2D = projection.xy / projection.w;
-        gl_MeshVerticesEXT[x].gl_Position = vec4(screen2D, 0.0f, 1.0f);
-        screenSpace[x] = screen2D;
-        projectionDepths[x] = projection / projection.w;
-        if(currentX > screen2D.x) {
+        const vec4 projection = pointsToUse[x];
+        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0.0f, 1.0f);
+        if(currentX > projection.x) {
             mostLeft = x;
-            currentX = screen2D.x;
+            currentX = projection.x;
         }
-        if(currentXRight < screen2D.x) {
+        if(currentXRight < projection.x) {
             mostRight = x;
-            currentXRight = screen2D.x;
+            currentXRight = projection.x;
         }
     }
     
@@ -67,7 +58,7 @@ void main() {
         if(mostRight == x || mostLeft == x) {
             continue;
         }
-        float dist = distToLine(screenSpace[mostLeft], screenSpace[mostRight], screenSpace[x]);
+        float dist = distToLine(pointsToUse[mostLeft].xy, pointsToUse[mostRight].xy, pointsToUse[x].xy);
         if(dist > distanceToLine) {
             distanceToLine = dist;
             mostDistantOne = x;
@@ -78,20 +69,20 @@ void main() {
         }
     }
 
-    uint triangleOuter[3] = { mostLeft, mostRight, mostDistantOne };
+    const uint triangleOuter[3] = { mostLeft, mostRight, mostDistantOne };
 
-    vec2 P2 = screenSpace[mostDistantOne];
-    vec2 dP0 = screenSpace[mostLeft] - P2;
-    vec2 dP1 = screenSpace[mostRight] - P2;
-    vec2 dP3 = screenSpace[otherDist] - P2;
-    float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
+    const vec2 P2 = pointsToUse[mostDistantOne].xy;
+    const vec2 dP0 = pointsToUse[mostLeft].xy - P2;
+    const vec2 dP1 = pointsToUse[mostRight].xy - P2;
+    const vec2 dP3 = pointsToUse[otherDist].xy - P2;
+    const float faktor = dP0.y * dP1.x - dP0.x * dP1.y;
     // Multiply inverse
-    vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
-    float lambda2 = 1.0f - lambdas.y - lambdas.x;
+    const vec2 lambdas = vec2(dP1.x * dP3.y - dP1.y * dP3.x, dP0.y * dP3.x - dP0.x * dP3.y) / faktor;
+    const float lambda2 = 1.0f - lambdas.y - lambdas.x;
     if(lambdas.x <= 0.0f || lambdas.y <= 0.0f || lambda2 <= 0.0f) {
         // Case 2
-        float p2Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], P2);
-        float p3Dist = aboveLine(screenSpace[mostLeft], screenSpace[mostRight], screenSpace[otherDist]);
+        const float p2Dist = aboveLine(pointsToUse[mostLeft].xy, pointsToUse[mostRight].xy, P2);
+        const float p3Dist = aboveLine(pointsToUse[mostLeft].xy, pointsToUse[mostRight].xy, pointsToUse[otherDist].xy);
 
         uvec2 lineOne;
         uvec2 lineTwo;
@@ -103,10 +94,10 @@ void main() {
             lineTwo.y = mostDistantOne;
         } else {
             // Case: We need to find the bisection point
-            vec2 baseline = normalize(screenSpace[mostRight] - screenSpace[mostLeft]);
+            const vec2 baseline = normalize(pointsToUse[mostRight].xy - pointsToUse[mostLeft].xy);
             
-            float w1 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[otherDist]));
-            float w2 = dot(baseline, normalize(screenSpace[mostRight] - screenSpace[mostDistantOne]));
+            const float w1 = dot(baseline, normalize(pointsToUse[mostRight].xy - pointsToUse[otherDist].xy));
+            const float w2 = dot(baseline, normalize(pointsToUse[mostRight].xy - pointsToUse[mostDistantOne].xy));
             lineOne.x = mostLeft;
             lineOne.y = mostDistantOne;
             lineTwo.x = mostRight;
@@ -117,15 +108,15 @@ void main() {
             }
         }
 
-        vec2 P1 = screenSpace[lineOne.x];
-        vec2 P0 = screenSpace[lineTwo.x];
-        vec2 dP31 = screenSpace[lineOne.y] - P1;
-        vec2 dP20 = screenSpace[lineTwo.y] - P0;
-        vec2 dP01 = P0 - P1;
+        const vec2 P1 = pointsToUse[lineOne.x].xy;
+        const vec2 P0 = pointsToUse[lineTwo.x].xy;
+        const vec2 dP31 = pointsToUse[lineOne.y].xy - P1;
+        const vec2 dP20 = pointsToUse[lineTwo.y].xy - P0;
+        const vec2 dP01 = P0 - P1;
         
-        float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
-        vec2 midpoint = P1 + dP31 * s;
-        float t = dot(dP20, midpoint - P0) / dot(dP20, dP20);
+        const float s = (dP01.x * dP20.y - dP01.y  * dP20.x) / (dP31.x * dP20.y - dP31.y  * dP20.x);
+        const vec2 midpoint = P1 + dP31 * s;
+        const float t = dot(dP20, midpoint - P0) / dot(dP20, dP20);
 
         gl_MeshVerticesEXT[4].gl_Position = vec4(midpoint, 0.0f, 1.0f);
 
@@ -135,16 +126,16 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[3] = uvec3(lineOne.x, lineTwo.x, 4);
 
         for(uint x = 0; x < 4; x++) {
-            vec4 vz = projectionDepths[x];
-            float z = vz.z / vz.w;
+            const vec4 vz = pointsToUse[x];
+            const float z = vz.z / vz.w;
             depthsMinMax[x] = vec4(vz.xy / vz.w, z, z);
         }
-        vec4 va = projectionDepths[lineOne.x];
-        vec4 vc = projectionDepths[lineOne.y];
-        vec4 vb = projectionDepths[lineTwo.x];
-        vec4 vd = projectionDepths[lineTwo.y];
-        float oneZ0 = 1.0f / ((1.0f - s) / va.z + s / vc.z);
-        float oneZ1 = 1.0f / ((1.0f - t) / vb.z + t / vd.z);
+        const vec4 va = pointsToUse[lineOne.x];
+        const vec4 vc = pointsToUse[lineOne.y];
+        const vec4 vb = pointsToUse[lineTwo.x];
+        const vec4 vd = pointsToUse[lineTwo.y];
+        const float oneZ0 = 1.0f / ((1.0f - s) / va.z + s / vc.z);
+        const float oneZ1 = 1.0f / ((1.0f - t) / vb.z + t / vd.z);
 
         lambdasOut[0] = primColorOut;
         lambdasOut[1] = primColorOut;
@@ -155,17 +146,17 @@ void main() {
 
         SetMeshOutputsEXT(5, 4);
     } else {
-        float[] lambdaArray = {lambdas.x, lambdas.y, lambda2};
+        const float[] lambdaArray = {lambdas.x, lambdas.y, lambda2};
         float z1 = 0;
         for(uint x = 0; x < 3; x++) {
-            uint id = triangleOuter[x];
-            vec4 vz = projectionDepths[id];
+            const uint id = triangleOuter[x];
+            const vec4 vz = pointsToUse[id];
             depthsMinMax[id] = vec4(vz.xy, vz.z, vz.z);
             z1 += lambdaArray[x] / vz.z;
         }
-        vec4 vz = projectionDepths[otherDist];
-        float z0 = vz.z;
-        float oneZ1 = 1.0f / z1;
+        const vec4 vz = pointsToUse[otherDist];
+        const float z0 = vz.z;
+        const float oneZ1 = 1.0f / z1;
         depthsMinMax[otherDist] = vec4(vz.xy, min(z0, oneZ1), max(z0, oneZ1));
 
         // Case 1

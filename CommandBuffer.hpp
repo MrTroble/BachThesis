@@ -51,15 +51,15 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
     const vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     currentBuffer.begin(beginInfo);
 
-    if (context.sortingOfPrimitives) {
+    if (context.settings.sortingOfPrimitives) {
         for (const auto& vtk : vtkFiles)
         {
             currentBuffer.executeCommands(vtk.sortSecondary);
         }
     }
 
-    const size_t lodToUse = context.useLOD ? ((size_t)context.currentLOD + 1u) : 1u;
-    if (context.useLOD) {
+    const size_t lodToUse = context.settings.useLOD ? ((size_t)context.settings.currentLOD + 1u) : 1u;
+    if (context.settings.useLOD) {
         const size_t nextLOD = lodToUse + 1;
         for (const auto& vtk : vtkFiles)
         {
@@ -75,12 +75,12 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
 
     const vk::ClearColorValue whiteValue{ 1.0f, 1.0f, 1.0f, 1.0f };
     const vk::ClearColorValue blackValue{ 0.0f, 0.0f, 0.0f, 1.0f };
-    const vk::ClearValue clearColor(context.type == PipelineType::ProxyABuffer ? blackValue : whiteValue);
+    const vk::ClearValue clearColor(context.settings.type == PipelineType::ProxyABuffer ? blackValue : whiteValue);
     const vk::RenderPassBeginInfo renderPassBegin(context.renderPass, context.frameBuffer[currentImage],
         { {0,0}, context.currentExtent }, clearColor);
     currentBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
 
-    const vk::Pipeline currentPipeline = getFromType(context.type, context);
+    const vk::Pipeline currentPipeline = getFromType(context.settings.type, context);
     currentBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline);
 
     for (const auto& vtk : vtkFiles)
@@ -348,18 +348,18 @@ struct CameraInfo {
 inline void updateCamera(IContext& context) {
     CameraInfo* cameraMap = (CameraInfo*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
     const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
-    auto projectionMatrix = glm::perspective(context.FOV, aspect, context.planes.x, context.planes.y);
+    auto projectionMatrix = glm::perspective(context.settings.FOV, aspect, context.settings.planes.x, context.settings.planes.y);
     projectionMatrix[1][1] *= -1;
     cameraMap->proj = projectionMatrix;
-    glm::vec3 lookAt = glm::vec3(glm::rotate(glm::identity<glm::mat4>(), context.lookAtPosition.x, glm::vec3{ 0, 1, 0 }) * glm::vec4{ 1, 0, 0, 1 });
-    lookAt = glm::rotate(glm::identity<glm::mat4>(), context.lookAtPosition.y, glm::vec3{ 0, 0, 1 }) * glm::vec4(lookAt, 1);
-    lookAt = glm::normalize(lookAt) * context.lookAtPosition.z;
-    cameraMap->view = glm::lookAt(context.position + lookAt, context.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
+    glm::vec3 lookAt = glm::vec3(glm::rotate(glm::identity<glm::mat4>(), context.settings.rotationAndZoom.x, glm::vec3{ 0, 1, 0 }) * glm::vec4{ 1, 0, 0, 1 });
+    lookAt = glm::rotate(glm::identity<glm::mat4>(), context.settings.rotationAndZoom.y, glm::vec3{ 0, 0, 1 }) * glm::vec4(lookAt, 1);
+    lookAt = glm::normalize(lookAt) * context.settings.rotationAndZoom.z;
+    cameraMap->view = glm::lookAt(context.settings.position + lookAt, context.settings.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
     cameraMap->model = glm::identity<glm::mat4>();
     cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
     cameraMap->inverse = glm::inverse(projectionMatrix * cameraMap->view);
-    cameraMap->colorADepth = context.colorADepth;
-    cameraMap->lod = context.currentLOD - ((uint32_t)context.currentLOD);
+    cameraMap->colorADepth = context.settings.colorADepth;
+    cameraMap->lod = context.settings.currentLOD - ((uint32_t)context.settings.currentLOD);
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

@@ -198,14 +198,13 @@ int main()
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
     const auto startTimeLoading = std::chrono::steady_clock::now();
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "Armadillo.vtk"};
+    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "Armadillo.vtk" };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {
         loadedVtkFiles.push_back(loadVTK(std::string("assets/") + value, icontext));
     }
     std::vector<VTKFile> vtkFiles = { loadedVtkFiles[0] };
-    std::vector<char> active;
-    active.resize(loadedVtkFiles.size(), false);
+    std::vector<char>& active = icontext.settings.activeModels;
     active[0] = true;
     const ScopeExit cleanCrystal([&]() { for (auto& file : loadedVtkFiles) file.unload(icontext); });
     const auto endTimeLoading = std::chrono::steady_clock::now();
@@ -215,6 +214,15 @@ int main()
     int64_t currentValue = 0;
     std::deque<float> smoothing;
     constexpr size_t MAX_SMOOTH = 1000;
+
+    const auto updateVTKs = [&]() {
+        vtkFiles.clear();
+        for (size_t i = 0; i < vtkNames.size(); i++) {
+            if (active[i]) {
+                vtkFiles.push_back(loadedVtkFiles[i]);
+            }
+        }
+        };
 
     while (!glfwWindowShouldClose(icontext.window))
     {
@@ -242,16 +250,33 @@ int main()
         ImGui::NewFrame();
         //ImGui::ShowDemoWindow();
         if (ImGui::Begin("Debug Menue")) {
-            const auto currentName = std::to_string(icontext.type);
+            const auto currentPreset = to_string(icontext.presetType);
+            if (ImGui::BeginCombo("Preset", currentPreset.c_str())) {
+                const size_t currentSelected = (size_t)icontext.presetType;
+                for (size_t i = 0; i < PRESET_TYPE_AMOUNT; i++)
+                {
+                    const auto currentType = (PresetType)i;
+                    const auto name = to_string(currentType);
+                    const bool isSelected = (currentSelected == i);
+                    if (ImGui::Selectable(name.c_str(), isSelected) && currentType != PresetType::Default) {
+                        icontext.settings = getSettingFromType(currentType);
+                        icontext.presetType = currentType;
+                        updateVTKs();
+                    }
+                    if (isSelected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            const auto currentName = std::to_string(icontext.settings.type);
             if (ImGui::BeginCombo("Pipeline", currentName.c_str())) {
-                const size_t currentSelected = (size_t)icontext.type;
+                const size_t currentSelected = (size_t)icontext.settings.type;
                 for (size_t i = 0; i < PIPELINE_TYPE_AMOUNT; i++)
                 {
                     const auto currentType = (PipelineType)i;
                     const auto name = std::to_string(currentType);
                     const bool isSelected = (currentSelected == i);
                     if (ImGui::Selectable(name.c_str(), isSelected))
-                        icontext.type = currentType;
+                        icontext.settings.type = currentType;
                     if (isSelected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
@@ -262,24 +287,19 @@ int main()
             if (ImGui::CollapsingHeader("Models")) {
                 for (size_t i = 0; i < vtkNames.size(); i++)
                 {
-                    if(ImGui::Checkbox(vtkNames[i], (bool*)&active[i])) {
-                        vtkFiles.clear();
-                        for (size_t i = 0; i < vtkNames.size(); i++) {
-                            if (active[i]) {
-                                vtkFiles.push_back(loadedVtkFiles[i]);
-                            }
-                        }
+                    if (ImGui::Checkbox(vtkNames[i], (bool*)&active[i])) {
+                        updateVTKs();
                     }
                 }
             }
             if (ImGui::CollapsingHeader("Camera")) {
-                ImGui::SliderFloat2("Planes", &icontext.planes.x, 0.001f, 1000.0f);
-                ImGui::SliderFloat("FOV", &icontext.FOV, 0.1f, 3.0f);
-                ImGui::SliderFloat3("Position", &icontext.position.x, 0, 10.0f);
-                ImGui::SliderFloat2("Rotation", &icontext.lookAtPosition.x, -3.0f, 3.0f);
-                ImGui::SliderFloat("Zoom", &icontext.lookAtPosition.z, 0, 10.0f);
-                ImGui::SliderFloat3("Color Factor", &icontext.colorADepth.x, 0, 1.0f);
-                ImGui::SliderFloat("Depth Factor", &icontext.colorADepth.w, 0, 10.0f);
+                ImGui::SliderFloat2("Planes", &icontext.settings.planes.x, 0.001f, 1000.0f);
+                ImGui::SliderFloat("FOV", &icontext.settings.FOV, 0.1f, 3.0f);
+                ImGui::SliderFloat3("Position", &icontext.settings.position.x, 0, 10.0f);
+                ImGui::SliderFloat2("Rotation", &icontext.settings.rotationAndZoom.x, -3.0f, 3.0f);
+                ImGui::SliderFloat("Zoom", &icontext.settings.rotationAndZoom.z, 0, 10.0f);
+                ImGui::SliderFloat3("Color Factor", &icontext.settings.colorADepth.x, 0, 1.0f);
+                ImGui::SliderFloat("Depth Factor", &icontext.settings.colorADepth.w, 0, 10.0f);
                 if (ImGui::Button("Centre")) {
                     AABB aabb{};
                     for (size_t i = 0; i < vtkNames.size(); i++) {
@@ -288,14 +308,14 @@ int main()
                         }
                     }
                     const auto middle = (aabb.max + aabb.min) * 0.5f;
-                    icontext.position = middle;
+                    icontext.settings.position = middle;
                 }
             }
             if (ImGui::CollapsingHeader("LOD")) {
-                ImGui::SliderFloat("Current LOD", &icontext.currentLOD, 0.0f, -0.1f + LOD_COUNT -1.0f);
-                ImGui::Checkbox("Use LOD", &icontext.useLOD);
+                ImGui::SliderFloat("Current LOD", &icontext.settings.currentLOD, 0.0f, -0.1f + LOD_COUNT - 1.0f);
+                ImGui::Checkbox("Use LOD", &icontext.settings.useLOD);
             }
-            ImGui::Checkbox("Sort primitives", &icontext.sortingOfPrimitives);
+            ImGui::Checkbox("Sort primitives", &icontext.settings.sortingOfPrimitives);
         }
         ImGui::End();
         ImGui::Render();

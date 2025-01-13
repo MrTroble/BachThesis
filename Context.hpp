@@ -48,6 +48,54 @@ namespace std {
     }
 }
 
+struct ContextSetting {
+    // General
+    PipelineType type = PipelineType::Wireframe;
+    bool sortingOfPrimitives = false;
+    std::vector<char> activeModels = std::vector<char>(5u, false);
+    // Camera
+    glm::vec2 planes{ 0.01f, 100.0f };
+    float FOV = glm::radians(45.0f);
+    glm::vec3 position{ 0.0f, 0.0f, 0.0f };
+    glm::vec3 rotationAndZoom{ 0.0f, 0.0f, 1.0f };
+    glm::vec4 colorADepth{ 1.0f, 1.0f, 1.0f, 1.0f };
+    // LOD
+    float currentLOD = 0.0f;
+    bool useLOD = false;
+};
+
+enum class PresetType {
+    Default, BunnyTest
+};
+constexpr size_t PRESET_TYPE_AMOUNT = (size_t)PresetType::BunnyTest + 1;
+inline std::string to_string(PresetType type) {
+    switch (type)
+    {
+    case PresetType::Default:
+        return "Default";
+    case PresetType::BunnyTest:
+        return "Bunny test";
+    default:
+        break;
+    }
+}
+inline ContextSetting getSettingFromType(PresetType type) {
+    ContextSetting setting;
+    switch (type)
+    {
+    case PresetType::BunnyTest:
+        setting.colorADepth.w = 10.0f;
+        setting.position = { -0.017f, 0.110, -0.001 };
+        setting.rotationAndZoom = { 1.2f, 0.0f, 0.22f };
+        setting.activeModels[3] = true;
+        setting.type = PipelineType::Proxy;
+        return setting;
+    default:
+        setting.activeModels[0] = true;
+        return setting;
+    }
+}
+
 struct IContext {
     GLFWwindow* window;
     vk::DispatchLoaderDynamic dynamicLoader;
@@ -89,20 +137,11 @@ struct IContext {
     vk::DeviceMemory cameraMemory;
     vk::Buffer stagingCamera;
     vk::Buffer uniformCamera;
-    // Camera
-    glm::vec2 planes{ 0.01f, 100.0f};
-    float FOV = glm::radians(45.0f);
-    glm::vec3 position{ 0.0f, 0.0f, 0.0f };
-    glm::vec3 lookAtPosition{ 0.0f, 0.0f, 1.0f };
-    glm::vec4 colorADepth{1.0f, 1.0f, 1.0f, 1.0f};
-    // Settings
-    PipelineType type = PipelineType::Wireframe;
-    bool sortingOfPrimitives = false;
     // Queue
     vk::Queue primaryQueue;
-    // LOD
-    float currentLOD = 0.0f;
-    bool useLOD = false;
+    // Settings
+    ContextSetting settings;
+    PresetType presetType = PresetType::Default;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();
