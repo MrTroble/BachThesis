@@ -8,7 +8,9 @@
 layout (local_size_x=128) in;
 
 // Tetrahedron output
-taskPayloadSharedEXT vec4 pointsToUse[4];
+taskPayloadSharedEXT struct Meshlet {
+    vec4 pointsToUse[4];
+} m;
 
 layout (binding=0) uniform Camera {
     mat4 model;
@@ -45,19 +47,19 @@ void main() {
     }
     const uvec4 tetrahedron = index.data[currentIndex];
     // Manually unroll
-    pointsToUse[0] = camera.whole * vertex.vertexData[tetrahedron[0]];
-    pointsToUse[0] /= pointsToUse[0].w;
-    pointsToUse[1] = camera.whole * vertex.vertexData[tetrahedron[1]];
-    pointsToUse[1] /= pointsToUse[1].w;
-    pointsToUse[2] = camera.whole * vertex.vertexData[tetrahedron[2]];
-    pointsToUse[2] /= pointsToUse[2].w;
-    pointsToUse[3] = camera.whole * vertex.vertexData[tetrahedron[3]];
-    pointsToUse[3] /= pointsToUse[3].w;
+    m.pointsToUse[0] = camera.whole * vertex.vertexData[tetrahedron[0]];
+    m.pointsToUse[0] /= m.pointsToUse[0].w;
+    m.pointsToUse[1] = camera.whole * vertex.vertexData[tetrahedron[1]];
+    m.pointsToUse[1] /= m.pointsToUse[1].w;
+    m.pointsToUse[2] = camera.whole * vertex.vertexData[tetrahedron[2]];
+    m.pointsToUse[2] /= m.pointsToUse[2].w;
+    m.pointsToUse[3] = camera.whole * vertex.vertexData[tetrahedron[3]];
+    m.pointsToUse[3] /= m.pointsToUse[3].w;
     
     // Clipping
     bool allNot = false;
     for(uint x = 0; x < 4; x++) {
-        const vec4 screen2D = pointsToUse[x];
+        const vec4 screen2D = m.pointsToUse[x];
         if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
             allNot = true;
     }

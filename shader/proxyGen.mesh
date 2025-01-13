@@ -11,7 +11,9 @@ layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
 // Task shader input
-taskPayloadSharedEXT vec4 pointsToUse[4];
+taskPayloadSharedEXT struct Meshlet {
+    vec4 pointsToUse[4];
+} m;
 
 // Color out
 layout(location=2) perprimitiveEXT out vec3 lambdasOut[];
@@ -30,6 +32,7 @@ float distToLine(vec2 l1, vec2 l2, vec2 p) {
 }
 
 void main() {
+    const vec4 pointsToUse[4] = m.pointsToUse;
     const uint currentClass = gl_WorkGroupID.x % 3;
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
