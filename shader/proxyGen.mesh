@@ -36,7 +36,12 @@ void main() {
     const uint currentClass = gl_WorkGroupID.x % 3;
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
-    
+   
+    lambdasOut[0] = primColorOut;
+    lambdasOut[1] = primColorOut;
+    lambdasOut[2] = primColorOut;
+    lambdasOut[3] = primColorOut;
+
     uint mostLeft = 0;
     float currentX = FLT_MAX;
     uint mostRight = 0;
@@ -140,11 +145,6 @@ void main() {
         const float oneZ0 = 1.0f / ((1.0f - s) / va.z + s / vc.z);
         const float oneZ1 = 1.0f / ((1.0f - t) / vb.z + t / vd.z);
 
-        lambdasOut[0] = primColorOut;
-        lambdasOut[1] = primColorOut;
-        lambdasOut[2] = primColorOut;
-        lambdasOut[3] = primColorOut;
-
         depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
         SetMeshOutputsEXT(5, 4);
@@ -166,10 +166,6 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[0] = uvec3(triangleOuter[0], triangleOuter[1], otherDist);
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
-        
-        lambdasOut[0] = primColorOut;
-        lambdasOut[1] = primColorOut;
-        lambdasOut[2] = primColorOut;
 
         SetMeshOutputsEXT(4, 3);
     }

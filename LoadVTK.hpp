@@ -130,7 +130,7 @@ inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
     return level;
 }
 
-inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::vector<glm::vec4>& vertices,
+inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector<glm::vec4>& vertices,
     const std::vector<Tetrahedron>& tetrahedrons) {
 
     LODLevel level;
@@ -142,6 +142,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
             break;
         if (!level.usageAfter[i] || !lodGenerateInfo.outer[i])
             continue;
+#ifndef NDEBUG
+        std::cout << "Starting test for id: " << i << std::endl;
+#endif
         const auto preyIndex = i;
         const auto& neighbours = lodGenerateInfo.graph[preyIndex];
         const auto& prey = tetrahedrons[preyIndex];
@@ -185,7 +188,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
                 break;
             }
         }
-        if(flipping) continue;
+        if (flipping) continue;
 
         auto& lodInfo = level.lodTetrahedrons.emplace_back();
         lodInfo.tetrahedron = tetrahedrons[preyIndex];
@@ -193,6 +196,8 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, const std::
         {
             const auto currentPoint = vertices[prey.indices[i]];
             lodInfo.previous[i] = currentPoint;
+            // Update vertices for further LOD levels
+            vertices[prey.indices[i]] = all;
         }
         lodInfo.next = all;
         level.usageAfter[preyIndex] = 0;
@@ -244,6 +249,28 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         }
     }
 
+#ifndef NDEBUG // Check if model is minimal
+    static constexpr float EPS = 1e-14f;
+    for (const auto& vertex : vertices)
+    {
+        size_t amount = 0;
+        for (const auto& other : vertices)
+        {
+            // check if near
+            bool all = true;
+            for (size_t i = 0; i < 4; i++)
+            {
+                if (std::abs(vertex[i] - other[i]) > EPS) {
+                    all = false;
+                    break;
+                }
+            }
+            if(all) amount++;
+        }
+        assert(amount == 1);
+    }
+#endif // NDEBUG
+
     std::vector<std::vector<TetIndex>> vertexConnection(vertices.size());
     for (auto& vec : vertexConnection) vec.reserve(64);
     for (TetIndex i = 0; i < tetrahedrons.size(); i++)
@@ -261,10 +288,10 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     size_t currentIndex = 0;
     for (const auto& tet : tetrahedrons)
     {
-        addedValues.clear();
         for (const auto dirtyValue : addedValues) {
             currentTetValues[dirtyValue] = 0;
         }
+        addedValues.clear();
 
         for (size_t i = 0; i < 4; i++)
         {
@@ -273,7 +300,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             for (const auto otherTetIndex : connected) {
                 if (otherTetIndex == currentIndex) continue;
                 const auto oldValue = currentTetValues[otherTetIndex];
-                if(oldValue == 0) addedValues.push_back(otherTetIndex);
+                if (oldValue == 0) addedValues.push_back(otherTetIndex);
                 currentTetValues[otherTetIndex] = oldValue + 1;
             }
         }
@@ -299,10 +326,11 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             if (type == EdgeType::Face) amount++;
             if (amount == SIDES_PER_TETRAHEDRON) break;
         }
-        if (amount == SIDES_PER_TETRAHEDRON) continue;
+        if (amount == SIDES_PER_TETRAHEDRON) {
+            continue;
+        }
         allowedToTake[i] = false;
         for (const auto& [other, type] : connected) {
-            if (type == EdgeType::Point) continue;
             allowedToTake[other] = false;
         }
     }
@@ -311,12 +339,13 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     levelToGenerate[0] = defaultLODLevel(context, tetrahedronGraph);
     const size_t stateSize = (tetrahedrons.size() / sizeof(uint32_t) + 1) * sizeof(uint32_t);
     size_t additionalDataSize = LOD_COUNT * stateSize;
+    auto modifiableLODVertex = vertices;
     for (size_t i = 1; i < LOD_COUNT; i++)
     {
         LODGenerateInfo generateInfo{
             levelToGenerate[i - 1].usageAfter, allowedToTake, tetrahedronGraph, context,
             (LodLevelFlag)i, Heuristic::Random, vtkFile };
-        levelToGenerate[i] = loadLODLevel(generateInfo, vertices, tetrahedrons);
+        levelToGenerate[i] = loadLODLevel(generateInfo, modifiableLODVertex, tetrahedrons);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);
     }
 
