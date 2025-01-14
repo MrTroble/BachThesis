@@ -180,9 +180,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             const glm::vec3 v0 = vertices[usedForPlane[1]] - point2;
             const glm::vec3 v1 = vertices[usedForPlane[2]] - point2;
             const auto planeNormal = glm::normalize(glm::cross(v0, v1));
-            const glm::vec3 oldVertex = vertices[otherPoint];
+            const glm::vec3 oldVertex = vertices[otherPoint] - point2;
             const auto signOld = glm::sign(glm::dot(planeNormal, oldVertex));
-            const auto signNew = glm::sign(glm::dot(planeNormal, midPoint));
+            const auto signNew = glm::sign(glm::dot(planeNormal, midPoint - glm::vec3(point2)));
             if (signOld != signNew) {
                 flipping = true;
                 break;
