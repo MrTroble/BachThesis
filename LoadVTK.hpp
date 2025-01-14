@@ -117,6 +117,7 @@ void recordBitonicSort(uint32_t n, vk::CommandBuffer buffer, IContext& context, 
 struct LODGenerateInfo {
     const std::vector<char>& previous;
     const std::vector<char>& outer;
+    const std::vector<LODTetrahedron>& previousTets;
     const TetGraph& graph;
     IContext& context;
     LodLevelFlag level;
@@ -135,12 +136,23 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
 
     LODLevel level;
     level.usageAfter = lodGenerateInfo.previous;
+    auto usageForCurrentLOD = lodGenerateInfo.previous;
+
+    std::vector<std::vector<size_t>> indexToTetrahedron(vertices.size());
+    size_t index = 0;
+    for (const auto& previous : lodGenerateInfo.previousTets) {
+        for (const auto& vertIndex : previous.tetrahedron.indices)
+        {
+            indexToTetrahedron[vertIndex].push_back(index);
+        }
+        index++;
+    }
 
     for (size_t i = 0; i < lodGenerateInfo.graph.size(); i++)
     {
         if (level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
             break;
-        if (!level.usageAfter[i] || !lodGenerateInfo.outer[i])
+        if (!usageForCurrentLOD[i] || !lodGenerateInfo.outer[i])
             continue;
         const auto preyIndex = i;
         const auto& neighbours = lodGenerateInfo.graph[preyIndex];
@@ -187,20 +199,26 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         }
         if (flipping) continue;
 
-        auto& lodInfo = level.lodTetrahedrons.emplace_back();
-        lodInfo.tetrahedron = tetrahedrons[preyIndex];
-        for (size_t i = 0; i < 4; i++)
         {
-            const auto currentPoint = vertices[prey.indices[i]];
-            lodInfo.previous[i] = currentPoint;
-            // Update vertices for further LOD levels
-            vertices[prey.indices[i]] = all;
+            auto& lodInfo = level.lodTetrahedrons.emplace_back();
+            lodInfo.tetrahedron = tetrahedrons[preyIndex];
+            lodInfo.next = all;
+            for (size_t i = 0; i < 4; i++)
+            {
+                const auto currentPoint = vertices[prey.indices[i]];
+                lodInfo.previous[i] = currentPoint;
+                // Update vertices for further LOD levels
+                vertices[prey.indices[i]] = all;
+            }
         }
-        lodInfo.next = all;
         level.usageAfter[preyIndex] = 0;
+        usageForCurrentLOD[preyIndex] = 0;
         for (const auto& [connecting, type] : neighbours)
         {
+            // Every neighbour should be excluded from the same LOD Level
+            usageForCurrentLOD[connecting] = 0;
             if (type == EdgeType::Point) continue;
+            // Only Edge and Face connections are actually collapsed and lose a dimension
             level.usageAfter[connecting] = 0;
         }
     }
@@ -262,7 +280,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
                     break;
                 }
             }
-            if(all) amount++;
+            if (all) amount++;
         }
         assert(amount == 1);
     }
@@ -340,7 +358,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     for (size_t i = 1; i < LOD_COUNT; i++)
     {
         LODGenerateInfo generateInfo{
-            levelToGenerate[i - 1].usageAfter, allowedToTake, tetrahedronGraph, context,
+            levelToGenerate[i - 1].usageAfter, allowedToTake, levelToGenerate[i - 1].lodTetrahedrons, tetrahedronGraph, context,
             (LodLevelFlag)i, Heuristic::Random, vtkFile };
         levelToGenerate[i] = loadLODLevel(generateInfo, modifiableLODVertex, tetrahedrons);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);

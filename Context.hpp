@@ -143,6 +143,7 @@ struct IContext {
     // Settings
     ContextSetting settings;
     PresetType presetType = PresetType::Default;
+    bool changedLOD = false;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();
