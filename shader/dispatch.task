@@ -10,6 +10,7 @@ layout (local_size_x=128) in;
 // Tetrahedron output
 taskPayloadSharedEXT struct Meshlet {
     vec4 pointsToUse[4];
+    uint tetID;
 } m;
 
 layout (binding=0) uniform Camera {
@@ -33,39 +34,43 @@ layout(set=1,binding=1) buffer lodBlock {
     uint visible[];
 };
 
-bool NotVisible(uint currentIndex) {
+uint Visible(uint currentIndex) {
     const uint index = currentIndex / 4;
     const uint shift = (currentIndex % 4) * 8;
-    return ((visible[index] >> shift) & 0xFF) == 0;
+    const uint visibilityCheck = ((visible[index] >> shift) & 0xFF);
+    return visibilityCheck;
 }
 
 void main() {
     const uint currentIndex = indexesToUse[gl_WorkGroupID.x];
-    if(NotVisible(currentIndex)) {
-        EmitMeshTasksEXT(0, 0, 0);
-        return;
+    uint executionAmount = 1;
+    if(Visible(currentIndex) == 0) {
+        executionAmount = 0;
+    } else {
+        const uvec4 tetrahedron = index.data[currentIndex];
+        m.tetID = currentIndex;
+        // Manually unroll
+        m.pointsToUse[0] = camera.whole * vertex.vertexData[tetrahedron[0]];
+        m.pointsToUse[0] /= m.pointsToUse[0].w;
+        m.pointsToUse[1] = camera.whole * vertex.vertexData[tetrahedron[1]];
+        m.pointsToUse[1] /= m.pointsToUse[1].w;
+        m.pointsToUse[2] = camera.whole * vertex.vertexData[tetrahedron[2]];
+        m.pointsToUse[2] /= m.pointsToUse[2].w;
+        m.pointsToUse[3] = camera.whole * vertex.vertexData[tetrahedron[3]];
+        m.pointsToUse[3] /= m.pointsToUse[3].w;
+        
+        // Clipping
+        bool allNot = false;
+        for(uint x = 0; x < 4; x++) {
+            const vec4 screen2D = m.pointsToUse[x];
+            if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
+                allNot = true;
+        }
+        if(!allNot) {
+            executionAmount = 0;
+        }
     }
-    const uvec4 tetrahedron = index.data[currentIndex];
-    // Manually unroll
-    m.pointsToUse[0] = camera.whole * vertex.vertexData[tetrahedron[0]];
-    m.pointsToUse[0] /= m.pointsToUse[0].w;
-    m.pointsToUse[1] = camera.whole * vertex.vertexData[tetrahedron[1]];
-    m.pointsToUse[1] /= m.pointsToUse[1].w;
-    m.pointsToUse[2] = camera.whole * vertex.vertexData[tetrahedron[2]];
-    m.pointsToUse[2] /= m.pointsToUse[2].w;
-    m.pointsToUse[3] = camera.whole * vertex.vertexData[tetrahedron[3]];
-    m.pointsToUse[3] /= m.pointsToUse[3].w;
-    
-    // Clipping
-    bool allNot = false;
-    for(uint x = 0; x < 4; x++) {
-        const vec4 screen2D = m.pointsToUse[x];
-        if(!(screen2D.x < -1 || screen2D.x > 1 || screen2D.y < -1 || screen2D.y > 1))
-            allNot = true;
-    }
-    if(!allNot) {
-        EmitMeshTasksEXT(0, 0, 0);
-        return;
-    }
-    EmitMeshTasksEXT(1, 1, 1);
+    // Must be called exactly once under unifrom controll flow
+    // Well this is fun
+    EmitMeshTasksEXT(executionAmount, 1, 1);
 }

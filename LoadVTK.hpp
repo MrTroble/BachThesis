@@ -142,9 +142,6 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             break;
         if (!level.usageAfter[i] || !lodGenerateInfo.outer[i])
             continue;
-#ifndef NDEBUG
-        std::cout << "Starting test for id: " << i << std::endl;
-#endif
         const auto preyIndex = i;
         const auto& neighbours = lodGenerateInfo.graph[preyIndex];
         const auto& prey = tetrahedrons[preyIndex];
