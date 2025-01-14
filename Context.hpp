@@ -94,6 +94,7 @@ inline ContextSetting getSettingFromType(PresetType type) {
         setting.activeModels[0] = true;
         return setting;
     }
+    return setting;
 }
 
 struct IContext {

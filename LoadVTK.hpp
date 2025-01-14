@@ -45,7 +45,7 @@ struct LODLevel {
     std::vector<LODTetrahedron> lodTetrahedrons;
     std::vector<char> usageAfter;
 };
-constexpr size_t COLAPSING_PER_LEVEL = 100u;
+constexpr size_t COLAPSING_PER_LEVEL = 250u;
 
 enum class LodLevelFlag {
     None, L1, L2, L3
