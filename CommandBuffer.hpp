@@ -154,7 +154,7 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv" };
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv", "colorNoDepth.frag.spv"};
     const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv", "dispatch.task.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -189,6 +189,12 @@ inline void recreatePipeline(IContext& context) {
 
     std::array colorPipelineShaderStages = {
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["color.frag.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"},
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eTaskEXT, context.shaderModule["dispatch.task.spv"], "main"}
+    };
+
+    std::array colorNoDepthPipelineShaderStages = {
+    vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eFragment, context.shaderModule["colorNoDepth.frag.spv"], "main"},
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eMeshEXT, context.shaderModule["proxyGen.mesh.spv"], "main"},
     vk::PipelineShaderStageCreateInfo{{}, vk::ShaderStageFlagBits::eTaskEXT, context.shaderModule["dispatch.task.spv"], "main"}
     };
@@ -236,6 +242,14 @@ inline void recreatePipeline(IContext& context) {
         if (result4.result != vk::Result::eSuccess)
             throw std::runtime_error("Pipeline error!");
         context.colorPipeline = result4.value;
+        colorBlends[0].colorBlendOp = vk::BlendOp::eAdd;
+        colorBlends[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+        colorBlends[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+        createWirelessCreateInfo.setStages(colorNoDepthPipelineShaderStages);
+        const auto result5 = context.device.createGraphicsPipeline({}, createWirelessCreateInfo);
+        if (result5.result != vk::Result::eSuccess)
+            throw std::runtime_error("Pipeline error!");
+        context.colorNoDepth = result5.value;
     }
     else {
         std::array noneMeshShaderStages = {

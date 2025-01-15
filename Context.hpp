@@ -26,7 +26,7 @@ struct CommandBufferContext {
 };
 
 enum class PipelineType {
-    Wireframe, Proxy, ProxyABuffer, Color
+    Wireframe, Proxy, ProxyABuffer, ColorNoDepth, Color
 };
 constexpr size_t PIPELINE_TYPE_AMOUNT = (size_t)PipelineType::Color + 1;
 
@@ -42,6 +42,8 @@ namespace std {
             return "Proxy with ABuffer";
         case PipelineType::Color:
             return "Color";
+        case PipelineType::ColorNoDepth:
+            return "Color No Depth";
         default:
             throw std::runtime_error("Pipeline type not found");
         }
@@ -78,6 +80,7 @@ inline std::string to_string(PresetType type) {
     default:
         break;
     }
+    throw std::runtime_error("Preset not found!");
 }
 inline ContextSetting getSettingFromType(PresetType type) {
     ContextSetting setting;
@@ -130,6 +133,7 @@ struct IContext {
     vk::Pipeline proxyPipeline;
     vk::Pipeline proxyABuffer;
     vk::Pipeline colorPipeline;
+    vk::Pipeline colorNoDepth;
     vk::Pipeline computeInitPipeline;
     vk::Pipeline computeSortPipeline;
     vk::Pipeline computeLODPipeline;
@@ -173,6 +177,8 @@ inline vk::Pipeline getFromType(PipelineType type, const IContext& context) {
         return context.proxyABuffer;
     case PipelineType::Color:
         return context.colorPipeline;
+    case PipelineType::ColorNoDepth:
+        return context.colorNoDepth;
     default:
         throw std::runtime_error("Pipeline type not found");
     }
