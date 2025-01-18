@@ -1,0 +1,40 @@
+#version 460
+
+#define FLT_MAX 3.402823466e+38
+
+layout(local_size_x = 128) in;
+
+layout (binding=0) uniform Camera {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 whole;
+    mat4 inverseM;
+    vec4 colorDepth;
+    float lod;
+    uint type;
+} camera;
+layout (binding=1) buffer Index {
+    uvec4 data[];
+} index;
+
+struct LODLevelChange {
+    uvec4 previous;
+    uint newID;
+    uint tetrahedronID;
+    uint align1;
+    uint align2;
+};
+
+layout (set=1, binding=2) buffer LOD {
+    LODLevelChange lodData[];
+};
+
+void main() {
+   LODLevelChange change = lodData[gl_WorkGroupID.x];
+   if(camera.type == 1) {
+       index.data[change.tetrahedronID] = change.previous;
+   } else {
+       index.data[change.tetrahedronID] = uvec4(change.newID);
+   }
+}

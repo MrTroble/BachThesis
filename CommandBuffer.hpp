@@ -154,7 +154,8 @@ inline void renderPassCreation(IContext& icontext) {
 }
 
 inline void loadAndAdd(IContext& context) {
-    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv", "lod.comp.spv", "colorNoDepth.frag.spv"};
+    std::vector shaderNames = { "test.frag.spv", "vertexWire.vert.spv", "debug.frag.spv", "color.frag.spv", "iota.comp.spv", "sort.comp.spv",
+                                "lod.comp.spv", "colorNoDepth.frag.spv", "updateLOD.comp.spv" };
     const std::array meshShader = { "testMesh.mesh.spv", "proxyGen.mesh.spv", "dispatch.task.spv" };
     if (context.meshShader) {
         std::ranges::copy(meshShader, std::back_inserter(shaderNames));
@@ -290,6 +291,8 @@ inline void createShaderPipelines(IContext& context) {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings),
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer,
+                    1, flagBitsForBindings),
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer,
                     1, flagBitsForBindings) };
     const vk::DescriptorSetLayoutCreateInfo lodBindingsSetCreateInfo({}, lodBindings);
     context.lodDescriptorSetLayout = context.device.createDescriptorSetLayout(lodBindingsSetCreateInfo);
@@ -306,6 +309,7 @@ inline void createShaderPipelines(IContext& context) {
     const auto iotaPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["iota.comp.spv"], "main" };
     const auto sortPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["sort.comp.spv"], "main" };
     const auto lodPipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["lod.comp.spv"], "main" };
+    const auto lodUpdatePipelineShaderStages = vk::PipelineShaderStageCreateInfo{ {}, vk::ShaderStageFlagBits::eCompute, context.shaderModule["updateLOD.comp.spv"], "main" };
 
     vk::ComputePipelineCreateInfo computePipeCreateInfo({}, iotaPipelineShaderStages, pipelineLayout);
     const auto result5 = context.device.createComputePipeline({}, computePipeCreateInfo);
@@ -322,6 +326,11 @@ inline void createShaderPipelines(IContext& context) {
     if (result7.result != vk::Result::eSuccess)
         throw std::runtime_error("Pipeline error!");
     context.computeLODPipeline = result7.value;
+    computePipeCreateInfo.setStage(lodUpdatePipelineShaderStages);
+    const auto result8 = context.device.createComputePipeline({}, computePipeCreateInfo);
+    if (result8.result != vk::Result::eSuccess)
+        throw std::runtime_error("Pipeline error!");
+    context.computeLODUpdatePipeline = result8.value;
 
     const vk::DescriptorPoolSize poolStorageSize(vk::DescriptorType::eStorageBuffer, 3000);
     const vk::DescriptorPoolSize poolUniformSize(vk::DescriptorType::eUniformBuffer, 1000);
@@ -347,6 +356,7 @@ inline void destroyShaderPipelines(IContext& context) {
     context.device.destroy(context.computeInitPipeline);
     context.device.destroy(context.computeSortPipeline);
     context.device.destroy(context.computeLODPipeline);
+    context.device.destroy(context.computeLODUpdatePipeline);
 }
 
 struct CameraInfo {
@@ -357,6 +367,7 @@ struct CameraInfo {
     glm::mat4 inverse;
     glm::vec4 colorADepth;
     float lod;
+    uint32_t type;
 };
 
 inline void updateCamera(IContext& context) {
@@ -373,7 +384,15 @@ inline void updateCamera(IContext& context) {
     cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
     cameraMap->inverse = glm::inverse(projectionMatrix * cameraMap->view);
     cameraMap->colorADepth = context.settings.colorADepth;
-    cameraMap->lod = context.settings.currentLOD - ((uint32_t)context.settings.currentLOD);
+    const auto values = ((uint32_t)context.settings.currentLOD);
+    cameraMap->lod = context.settings.currentLOD - values;
+    cameraMap->type = (context.oldLOD < values ? 0 : 1);
+    if (cameraMap->type == 0) {
+        const auto oldValues = ((uint32_t)context.oldLOD);
+        cameraMap->type = (context.settings.currentLOD < oldValues ? 0 : 2);
+    }
+    context.oldLOD = context.settings.currentLOD;
+    context.changedLOD = cameraMap->type != 0;
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();

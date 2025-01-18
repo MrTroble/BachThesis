@@ -41,8 +41,17 @@ struct LODTetrahedron {
     Tetrahedron tetrahedron;
 };
 
+struct LODLevelChange {
+    Tetrahedron previous;
+    TetIndex newID;
+    TetIndex tetrahedronID;
+    TetIndex align1;
+    TetIndex align2;
+};
+
 struct LODLevel {
     std::vector<LODTetrahedron> lodTetrahedrons;
+    std::vector<LODLevelChange> lodLevelChanges;
     std::vector<char> usageAfter;
 };
 constexpr size_t COLAPSING_PER_LEVEL = 250u;
@@ -66,8 +75,8 @@ inline std::string stringLODLevel(const LodLevelFlag flag) {
     }
 }
 
-using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 2>;
-using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 2>;
+using VTKBufferArray = std::array<vk::Buffer, 3 + LOD_COUNT * 3>;
+using VTKSizeArray = std::array<vk::DeviceSize, 3 + LOD_COUNT * 3>;
 using VTKDescriptorArray = std::vector<vk::DescriptorSet>;
 
 struct VTKFile {
@@ -137,7 +146,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
     LODLevel level;
     level.usageAfter = lodGenerateInfo.previous;
     auto usageForCurrentLOD = lodGenerateInfo.previous;
-
+    level.lodLevelChanges.push_back(LODLevelChange{{0u, 0u, 0u, 0u}, 0u, 0u, 0u, 0u});
     std::vector<std::vector<size_t>> indexToTetrahedron(vertices.size());
     size_t index = 0;
     for (const auto& previous : lodGenerateInfo.previousTets) {
@@ -355,12 +364,13 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     const size_t stateSize = (tetrahedrons.size() / sizeof(uint32_t) + 1) * sizeof(uint32_t);
     size_t additionalDataSize = LOD_COUNT * stateSize;
     auto modifiableLODVertex = vertices;
+    auto modifiableLODIndex = tetrahedrons;
     for (size_t i = 1; i < LOD_COUNT; i++)
     {
         LODGenerateInfo generateInfo{
             levelToGenerate[i - 1].usageAfter, allowedToTake, levelToGenerate[i - 1].lodTetrahedrons, tetrahedronGraph, context,
             (LodLevelFlag)i, Heuristic::Random, vtkFile };
-        levelToGenerate[i] = loadLODLevel(generateInfo, modifiableLODVertex, tetrahedrons);
+        levelToGenerate[i] = loadLODLevel(generateInfo, modifiableLODVertex, modifiableLODIndex);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);
     }
 
@@ -400,7 +410,9 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
                     sizeof(uint32_t) * tetrahedrons.size() };
     for (size_t i = 3; i < LOD_COUNT + 3; i++) {
         sizesRequested[i] = stateSize;
-        sizesRequested[i + LOD_COUNT] = levelToGenerate[i - 3].lodTetrahedrons.size() * sizeof(LODTetrahedron);
+        const auto& current = levelToGenerate[i - 3];
+        sizesRequested[i + LOD_COUNT] = current.lodTetrahedrons.size() * sizeof(LODTetrahedron);
+        sizesRequested[i + LOD_COUNT*2] = current.lodLevelChanges.size() * sizeof(LODLevelChange);
     }
 
     VTKSizeArray sizesActual;
@@ -446,7 +458,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     // LOD Descriptor
     const vk::DescriptorBufferInfo descriptorLOD0(localBuffers[3], 0, VK_WHOLE_SIZE);
     const vk::WriteDescriptorSet writeLOD0DescriptorSets(descriptor[1], 1, 0, vk::DescriptorType::eStorageBuffer, {}, descriptorLOD0);
-    std::array<vk::DescriptorBufferInfo, (LOD_COUNT - 1) * 2> lodBufferInfos;
+    std::array<vk::DescriptorBufferInfo, (LOD_COUNT - 1) * 3> lodBufferInfos;
     std::vector writeUpdateInfos = { writeCameraSets, writeIndexDescriptorSets,  writeVertexDescriptorSets, writeSortIndexDescriptorSets, writeLOD0DescriptorSets };
     for (size_t i = 0; i < LOD_COUNT - 1; i++)
     {
@@ -463,6 +475,14 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         if (dataBuffer) {
             auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT - 1];
             tetrahedrons = vk::DescriptorBufferInfo{ dataBuffer , 0, VK_WHOLE_SIZE };
+            const vk::WriteDescriptorSet writeData(currentDescriptor, 0, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
+            writeUpdateInfos.push_back(writeData);
+        }
+
+        const auto dataChangeBuffer = localBuffers[i + LOD_COUNT*2 + 4];
+        if (dataChangeBuffer) {
+            auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT*2 - 2];
+            tetrahedrons = vk::DescriptorBufferInfo{ dataChangeBuffer , 0, VK_WHOLE_SIZE };
             const vk::WriteDescriptorSet writeData(currentDescriptor, 0, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
             writeUpdateInfos.push_back(writeData);
         }

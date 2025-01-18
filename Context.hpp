@@ -67,9 +67,9 @@ struct ContextSetting {
 };
 
 enum class PresetType {
-    Default, BunnyTest
+    Default, BunnyTest, SortingSmall
 };
-constexpr size_t PRESET_TYPE_AMOUNT = (size_t)PresetType::BunnyTest + 1;
+constexpr size_t PRESET_TYPE_AMOUNT = (size_t)PresetType::SortingSmall + 1;
 inline std::string to_string(PresetType type) {
     switch (type)
     {
@@ -77,6 +77,8 @@ inline std::string to_string(PresetType type) {
         return "Default";
     case PresetType::BunnyTest:
         return "Bunny test";
+    case PresetType::SortingSmall:
+        return "Sorting";
     default:
         break;
     }
@@ -92,6 +94,13 @@ inline ContextSetting getSettingFromType(PresetType type) {
         setting.rotationAndZoom = { 1.2f, 0.0f, 0.22f };
         setting.activeModels[3] = true;
         setting.type = PipelineType::Proxy;
+        return setting;
+    case PresetType::SortingSmall:
+        setting.position = { 0.0f, 0.5f, 0.5f };
+        setting.rotationAndZoom = { 0.0f, 0.0f, 3.0f };
+        setting.activeModels[0] = true;
+        setting.sortingOfPrimitives = true;
+        setting.type = PipelineType::ColorNoDepth;
         return setting;
     default:
         setting.activeModels[0] = true;
@@ -137,6 +146,7 @@ struct IContext {
     vk::Pipeline computeInitPipeline;
     vk::Pipeline computeSortPipeline;
     vk::Pipeline computeLODPipeline;
+    vk::Pipeline computeLODUpdatePipeline;
     // Memory
     vk::DeviceMemory cameraStagingMemory;
     vk::DeviceMemory cameraMemory;
@@ -148,6 +158,7 @@ struct IContext {
     ContextSetting settings;
     PresetType presetType = PresetType::Default;
     bool changedLOD = false;
+    float oldLOD = 0;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {
         const auto properties = physicalDevice.getMemoryProperties();

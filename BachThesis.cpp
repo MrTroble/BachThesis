@@ -224,7 +224,7 @@ int main()
                 vtkFiles.push_back(loadedVtkFiles[i]);
             }
         }
-        };
+    };
 
     while (!glfwWindowShouldClose(icontext.window))
     {

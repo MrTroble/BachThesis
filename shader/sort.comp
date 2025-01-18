@@ -43,6 +43,12 @@ bool checkIn(vec3 inPoints[4], uint[5] index, vec2 p) {
     const float s2 = sign(aboveLine(inPoints[index[1]].xy, inPoints[index[2]].xy, p));
     if(s2 != s1)
         return false;
+    if(index[4] == 3) {
+        const float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[0]].xy, p));
+        if(s2 != s3)
+            return false;
+        return true;
+    }
     const float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[3]].xy, p));
     if(s2 != s3)
         return false;
@@ -146,14 +152,14 @@ vec3 getLamdas(vec2 p0, vec2 p1, vec2 p2, vec2 point) {
 }
 
 float getZAtPoint(vec3[4] screenSpace1, uint[5] index1, vec2 point) {
-    vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[1]], screenSpace1[index1[2]]};
-    vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
-    if(lambdas1.x <= 0.0f || lambdas1.y <= 0.0f || lambdas1.z <= 0.0f) {
-        vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[2]], screenSpace1[index1[3]]};
-        vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
-        return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
+    const vec3[3] values1 = {screenSpace1[index1[0]], screenSpace1[index1[1]], screenSpace1[index1[2]]};
+    const vec3 lambdas1 = getLamdas(values1[0].xy, values1[1].xy, values1[2].xy, point);
+    if(lambdas1.x < 0.0f || lambdas1.y < 0.0f || lambdas1.z < 0.0f) {
+        const vec3[3] values2 = {screenSpace1[index1[0]], screenSpace1[index1[2]], screenSpace1[index1[3]]};
+        const vec3 lambdas2 = getLamdas(values2[0].xy, values2[1].xy, values2[2].xy, point);
+        return 1/(lambdas2.x * (1/values2[0].z) + lambdas2.y * (1/values2[1].z) + lambdas2.z * (1/values2[2].z));
     }
-    return lambdas1.x * values1[0].z + lambdas1.y * values1[1].z + lambdas1.z * values1[2].z;
+    return 1/(lambdas1.x * (1/values1[0].z) + lambdas1.y * (1/values1[1].z) + lambdas1.z * (1/values1[2].z));
 }
 
 bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, uint[5] index2, out vec2 pointToCheck) {
@@ -258,15 +264,28 @@ void compareAndSwap(uint v1, uint v2) {
     float z1 = getZAtPoint(screenSpace1, index1, pointFound);
     float z2 = getZAtPoint(screenSpace2, index2, pointFound);
     // TODO z might be really close on adjacent tetrahedrons
-    if(((v1 & k) == 0 && z1 <= z2) ||
-       ((v1 & k) != 0 && z1 >= z2))
+    bool epsValue = abs(z1 - z2) < 1e-10f;
+    if(((v1 & k) == 0 && z1 > z2) ||
+       ((v1 & k) != 0 && z1 < z2))
        return;
     uint temp = toSort[v1];
     toSort[v1] = toSort[v2];
     toSort[v2] = temp;
 }
 
+void runTests() {
+    {
+        vec3 inPoints[4] = { {0.2f, 0.2f, 1.0f}, {0.4f, 0.2f, 1.0f}, {0.4f, 0.4f, 1.0f}, {0.2f, 0.4f, 1.0f} };
+        uint[5] index = { 0, 1, 2, 3, 3};
+        bool testIn1 = checkIn(inPoints, index, vec2(0.35f, 0.3f)) == true;
+        bool testIn2 = checkIn(inPoints, index, vec2(0.25f, 0.35f)) == false;
+        index[4] = 4;
+        bool testIn3 = checkIn(inPoints, index, vec2(0.25f, 0.35f)) == true;
+    }
+}
+
 void main() {
+    runTests();
     uint ij = gl_WorkGroupID.x ^ j;
     if (ij > gl_WorkGroupID.x) {
         compareAndSwap(gl_WorkGroupID.x, ij);
