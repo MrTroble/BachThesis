@@ -88,6 +88,7 @@ struct VTKFile {
     VTKDescriptorArray descriptor;
     AABB aabb;
     std::vector<size_t> lodAmount;
+    std::vector<size_t> lodUpdateAmount;
 
     void unload(IContext& context) {
         context.device.freeMemory(memory);
@@ -483,7 +484,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         if (dataChangeBuffer) {
             auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT*2 - 2];
             tetrahedrons = vk::DescriptorBufferInfo{ dataChangeBuffer , 0, VK_WHOLE_SIZE };
-            const vk::WriteDescriptorSet writeData(currentDescriptor, 0, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
+            const vk::WriteDescriptorSet writeData(currentDescriptor, 2, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
             writeUpdateInfos.push_back(writeData);
         }
     }
@@ -539,6 +540,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
     for (const auto& level : levelToGenerate)
     {
         file.lodAmount.push_back(level.lodTetrahedrons.size());
+        file.lodUpdateAmount.push_back(level.lodLevelChanges.size());
     }
     const auto result = context.device.waitForFences(fence, true, std::numeric_limits<uint64_t>().max());
     std::cout << "Loaded model: " << vtkFile << std::endl;

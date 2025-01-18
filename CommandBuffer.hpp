@@ -63,6 +63,13 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         const size_t nextLOD = lodToUse + 1;
         for (const auto& vtk : vtkFiles)
         {
+            const auto lodUpdateAmount = vtk.lodUpdateAmount[lodToUse];
+            if (context.changedLOD && lodUpdateAmount != 0) {
+                const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
+                currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
+                currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODUpdatePipeline);
+                currentBuffer.dispatch(lodUpdateAmount, 1, 1);
+            }
             const auto lodAmount = vtk.lodAmount[lodToUse];
             if (lodAmount == 0) continue;
             const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
