@@ -42,11 +42,10 @@ struct LODTetrahedron {
 };
 
 struct LODLevelChange {
-    Tetrahedron previous;
-    TetIndex newID;
-    TetIndex tetrahedronID;
-    TetIndex align1;
-    TetIndex align2;
+    uint32_t indexInTet;
+    uint32_t oldIndex;
+    uint32_t newIndex;
+    uint32_t tetrahedronID;
 };
 
 struct LODLevel {
@@ -146,8 +145,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
 
     LODLevel level;
     level.usageAfter = lodGenerateInfo.previous;
+    level.lodLevelChanges.reserve(COLAPSING_PER_LEVEL * 4);
     auto usageForCurrentLOD = lodGenerateInfo.previous;
-    level.lodLevelChanges.push_back(LODLevelChange{{0u, 0u, 0u, 0u}, 0u, 0u, 0u, 0u});
+
     std::vector<std::vector<size_t>> indexToTetrahedron(vertices.size());
     size_t index = 0;
     for (const auto& previous : lodGenerateInfo.previousTets) {
@@ -177,22 +177,28 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         const glm::vec3 midPoint = all;
         const std::span preySpan = prey.indices;
         bool flipping = false;
+        std::vector<std::pair<TetIndex, uint32_t>> connectingPoint(neighbours.size());
+        size_t indexOfNeighbour = 0;
         for (const auto& [connecting, type] : neighbours)
         {
+            indexOfNeighbour++;
             if (type != EdgeType::Point) continue;
             const auto& other = tetrahedrons[connecting];
             std::array<VertIndex, 3> usedForPlane;
             size_t amountFound = 0;
             VertIndex otherPoint;
+            VertIndex otherIndex;
             for (size_t i = 0; i < 4; i++)
             {
                 const auto index = other.indices[i];
                 if (std::ranges::find(preySpan, index) != preySpan.end()) {
                     otherPoint = index;
+                    otherIndex = i;
                     continue;
                 }
                 usedForPlane[amountFound++] = index;
             }
+            connectingPoint[indexOfNeighbour - 1] = { otherPoint, otherIndex };
             assert(amountFound == 3);
             // Test plane for flips
             const auto& point2 = vertices[usedForPlane[0]];
@@ -223,11 +229,18 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         }
         level.usageAfter[preyIndex] = 0;
         usageForCurrentLOD[preyIndex] = 0;
+        indexOfNeighbour = 0;
+        const auto newIndex = prey.indices[0];
         for (const auto& [connecting, type] : neighbours)
         {
             // Every neighbour should be excluded from the same LOD Level
             usageForCurrentLOD[connecting] = 0;
-            if (type == EdgeType::Point) continue;
+            indexOfNeighbour++;
+            if (type == EdgeType::Point) {
+                const auto [point, index] = connectingPoint[indexOfNeighbour - 1];
+                level.lodLevelChanges.emplace_back(index, point, newIndex, connecting);
+                continue;
+            }
             // Only Edge and Face connections are actually collapsed and lose a dimension
             level.usageAfter[connecting] = 0;
         }
@@ -373,6 +386,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             (LodLevelFlag)i, Heuristic::Random, vtkFile };
         levelToGenerate[i] = loadLODLevel(generateInfo, modifiableLODVertex, modifiableLODIndex);
         additionalDataSize += levelToGenerate[i].lodTetrahedrons.size() * sizeof(LODTetrahedron);
+        additionalDataSize += levelToGenerate[i].lodLevelChanges.size() * sizeof(LODLevelChange);
     }
 
     const auto tetrahedronByteSize = tetrahedrons.size() * sizeof(Tetrahedron);
@@ -398,6 +412,11 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         std::copy(lod.lodTetrahedrons.begin(), lod.lodTetrahedrons.end(), nextPointerData);
         nextPointer += stateSize;
         nextPointerData += lod.lodTetrahedrons.size();
+    }
+    LODLevelChange* nextChanged = (LODLevelChange*)nextPointerData;
+    for (const auto& lod : levelToGenerate) {
+        std::copy(lod.lodLevelChanges.begin(), lod.lodLevelChanges.end(), nextChanged);
+        nextChanged += lod.lodLevelChanges.size();
     }
     context.device.unmapMemory(stagingMemory);
     context.device.bindBufferMemory(stagingBuffer, stagingMemory, 0);
@@ -502,6 +521,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
 
     vk::BufferCopy copyVisibility(tetrahedronByteSize + vertexByteSize, 0, stateSize);
     vk::BufferCopy copyLODData(tetrahedronByteSize + vertexByteSize + LOD_COUNT * stateSize);
+
     size_t visible = 0;
     for (const auto& lod : levelToGenerate) {
         commandBuffer.copyBuffer(stagingBuffer, localBuffers[3 + visible], copyVisibility);
@@ -514,6 +534,18 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         copyVisibility.srcOffset += stateSize;
         copyLODData.srcOffset += sizeOfData;
     }
+
+    vk::BufferCopy copyLODChangeData(copyLODData.srcOffset);
+    for (const auto& lod : levelToGenerate) {
+        const auto sizeOfData = lod.lodLevelChanges.size() * sizeof(LODLevelChange);
+        if (sizeOfData != 0) {
+            copyLODChangeData.size = sizeOfData;
+            commandBuffer.copyBuffer(stagingBuffer, localBuffers[3 + LOD_COUNT + visible], copyLODChangeData);
+        }
+        visible++;
+        copyLODChangeData.srcOffset += sizeOfData;
+    }
+
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsWithZeroLOD, {});
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeInitPipeline);
     commandBuffer.dispatch(1, 1, 1);

@@ -157,7 +157,7 @@ struct IContext {
     // Settings
     ContextSetting settings;
     PresetType presetType = PresetType::Default;
-    bool changedLOD = false;
+    uint32_t changedLOD = 0;
     float oldLOD = 0;
 
     inline vk::DeviceMemory requestMemory(vk::DeviceSize memorySize, vk::MemoryPropertyFlags flags) {

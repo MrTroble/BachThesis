@@ -19,11 +19,10 @@ layout (binding=1) buffer Index {
 } index;
 
 struct LODLevelChange {
-    uvec4 previous;
-    uint newID;
+    uint indexInTet;
+    uint oldIndex;
+    uint newIndex;
     uint tetrahedronID;
-    uint align1;
-    uint align2;
 };
 
 layout (set=1, binding=2) buffer LOD {
@@ -33,8 +32,8 @@ layout (set=1, binding=2) buffer LOD {
 void main() {
    LODLevelChange change = lodData[gl_WorkGroupID.x];
    if(camera.type == 1) {
-       index.data[change.tetrahedronID] = change.previous;
+       index.data[change.tetrahedronID][change.indexInTet] = change.newIndex;
    } else {
-       index.data[change.tetrahedronID] = uvec4(change.newID);
+       index.data[change.tetrahedronID][change.indexInTet] = change.oldIndex;
    }
 }

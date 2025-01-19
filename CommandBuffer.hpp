@@ -65,7 +65,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         {
             const auto lodUpdateAmount = vtk.lodUpdateAmount[lodToUse];
             if (context.changedLOD && lodUpdateAmount != 0) {
-                const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[nextLOD] };
+                const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[context.changedLOD == 1 ? lodToUse: nextLOD] };
                 currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
                 currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODUpdatePipeline);
                 currentBuffer.dispatch(lodUpdateAmount, 1, 1);
@@ -393,13 +393,21 @@ inline void updateCamera(IContext& context) {
     cameraMap->colorADepth = context.settings.colorADepth;
     const auto values = ((uint32_t)context.settings.currentLOD);
     cameraMap->lod = context.settings.currentLOD - values;
-    cameraMap->type = (context.oldLOD < values ? 0 : 1);
+    cameraMap->type = (context.oldLOD < values ? 1 : 0);
     if (cameraMap->type == 0) {
         const auto oldValues = ((uint32_t)context.oldLOD);
-        cameraMap->type = (context.settings.currentLOD < oldValues ? 0 : 2);
+        cameraMap->type = (context.settings.currentLOD < oldValues ? 2 : 0);
     }
     context.oldLOD = context.settings.currentLOD;
-    context.changedLOD = cameraMap->type != 0;
+    context.changedLOD = cameraMap->type;
+#ifndef NDEBUG
+    if (context.changedLOD) {
+        assert(cameraMap->type == 1 || cameraMap->type == 2);
+        if (cameraMap->type == 1) std::cout << "Changed LOD Level up" << std::endl;
+        else std::cout << "Changed LOD Level down" << std::endl;
+    }
+#endif // !NDEBUG
+
     context.device.unmapMemory(context.cameraStagingMemory);
 
     const auto [buffer, fence] = context.commandBuffer.get<DataCommandBuffer::DataUpload>();
