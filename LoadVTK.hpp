@@ -20,7 +20,7 @@ constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 using TetIndex = uint32_t;
 
 enum class EdgeType : uint32_t {
-    Point = 1, Edge = 2, Face = 3
+    Collapsed = 0, Point = 1, Edge = 2, Face = 3
 };
 
 using Connection = std::tuple<TetIndex, EdgeType>;
@@ -140,6 +140,12 @@ inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
     return level;
 }
 
+struct UpdateInfoIntern {
+    TetIndex tetrahedron;
+    TetIndex connecting;
+    std::pair<VertIndex, uint32_t> connectionPoint;
+};
+
 inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector<glm::vec4>& vertices,
     std::vector<Tetrahedron>& tetrahedrons) {
 
@@ -158,6 +164,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         index++;
     }
 
+    std::vector<UpdateInfoIntern> updateInfo;
+    std::vector<std::pair<size_t, glm::vec4>> updateVertexData;
+    updateInfo.reserve(4096);
     for (size_t i = 0; i < lodGenerateInfo.graph.size(); i++)
     {
         if (level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
@@ -182,7 +191,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         for (const auto& [connecting, type] : neighbours)
         {
             indexOfNeighbour++;
-            if (type != EdgeType::Point) continue;
+            if (type != EdgeType::Point || !lodGenerateInfo.previous[connecting]) continue;
             const auto& other = tetrahedrons[connecting];
             std::array<VertIndex, 3> usedForPlane;
             size_t amountFound = 0;
@@ -196,9 +205,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
                     otherIndex = i;
                     continue;
                 }
+                assert(amountFound < 3);
                 usedForPlane[amountFound++] = index;
             }
-            assert(amountFound == 3);
             connectingPoint[indexOfNeighbour - 1] = { otherPoint, otherIndex };
             // Test plane for flips
             const auto& point2 = vertices[usedForPlane[0]];
@@ -206,8 +215,12 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             const glm::vec3 v1 = vertices[usedForPlane[2]] - point2;
             const auto planeNormal = glm::normalize(glm::cross(v0, v1));
             const glm::vec3 oldVertex = vertices[otherPoint] - point2;
+            assert(v0 != glm::vec3(0));
+            assert(v1 != glm::vec3(0));
+            assert(oldVertex != glm::vec3(0));
             const auto signOld = glm::sign(glm::dot(planeNormal, oldVertex));
-            const auto signNew = glm::sign(glm::dot(planeNormal, midPoint - glm::vec3(point2)));
+            const auto newDot = glm::dot(planeNormal, midPoint - glm::vec3(point2));
+            const auto signNew = glm::sign(newDot);
             if (signOld != signNew) {
                 flipping = true;
                 break;
@@ -224,7 +237,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
                 const auto currentPoint = vertices[prey.indices[i]];
                 lodInfo.previous[i] = currentPoint;
                 // Update vertices for further LOD levels
-                vertices[prey.indices[i]] = all;
+                updateVertexData.emplace_back(prey.indices[i], all);
             }
         }
         level.usageAfter[preyIndex] = 0;
@@ -238,54 +251,72 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             usageForCurrentLOD[connecting] = 0;
             indexOfNeighbour++;
             if (type == EdgeType::Point) {
-                const auto [point, index] = connectingPoint[indexOfNeighbour - 1];
-                level.lodLevelChanges.emplace_back(index, point, newIndex, connecting);
-                tetrahedrons[connecting].indices[index] = newIndex;
+                updateInfo.emplace_back(preyIndex, connecting, connectingPoint[indexOfNeighbour - 1]);
                 continue;
             }
             // Only Edge and Face connections are actually collapsed and lose a dimension
-            level.usageAfter[connecting] = 0;
-        }
-
-        size_t nextLevelChange = currentLevel;
-        for (auto& [connecting, type] : neighbours)
-        {
-            if (type == EdgeType::Point) {
-                const auto& changeNext = level.lodLevelChanges[nextLevelChange++];
-                const auto currentOldIndex = changeNext.oldIndex;
-                if (changeNext.newIndex == changeNext.oldIndex) continue;
-                // REBUILD LOCALLY
-                size_t otherLevelChange = currentLevel;
+            if (type != EdgeType::Collapsed) {
+                type = EdgeType::Collapsed;
                 auto& otherNeighbours = lodGenerateInfo.graph[connecting];
-                for (auto& [connectingOther, typeOther] : neighbours)
-                {
-                    if (typeOther != EdgeType::Point) continue;
-                    const auto& changeOther = level.lodLevelChanges[otherLevelChange++];
-                    const auto otherOldIndex = changeOther.oldIndex;
-                    if (otherOldIndex == changeOther.newIndex) continue;
-                    if(connectingOther == connecting || otherOldIndex == currentOldIndex) continue;
-                    auto value = std::ranges::find_if(otherNeighbours, [=](auto t) { return std::get<0>(t) == connectingOther; });
-                    
-                    const auto isNeighbour = value != std::end(otherNeighbours);
-                    if (isNeighbour) {
-                        size_t count = 0;
-                        for (const auto index : tetrahedrons[connecting].indices)
-                        {
-                            const auto& indices = tetrahedrons[connectingOther].indices;
-                            if (std::ranges::find(indices, index) != std::end(indices)) count++;
-                        }
-                        assert(count <= 3);
-                        std::get<1>(*value) = (EdgeType)count;
-                    }
-                    else {
-                        otherNeighbours.emplace_back(connectingOther, EdgeType::Point);
-                    }
-                }
-                continue;
+                auto value = std::ranges::find_if(otherNeighbours, [=](auto t) { return std::get<0>(t) == preyIndex; });
+                assert(value != std::end(otherNeighbours));
+                std::get<1>(*value) = EdgeType::Collapsed;
+                level.usageAfter[connecting] = 0;
             }
         }
 
     }
+
+    for (const auto& [index, vertex] : updateVertexData) {
+        vertices[index] = vertex;
+    }
+    for (const auto& updateInfo : updateInfo) {
+        const auto [point, index] = updateInfo.connectionPoint;
+        const auto preyIndex = updateInfo.tetrahedron;
+        auto& neighbours = lodGenerateInfo.graph[preyIndex];
+        const auto newIndex = tetrahedrons[preyIndex].indices[0];
+        const auto connecting = updateInfo.connecting;
+
+        level.lodLevelChanges.emplace_back(index, point, newIndex, connecting);
+        tetrahedrons[connecting].indices[index] = newIndex;
+    }
+
+    // REBUILD LOCALLY
+    for (const auto& updateInfo : updateInfo) {
+        const auto preyIndex = updateInfo.tetrahedron;
+        auto& neighbours = lodGenerateInfo.graph[preyIndex];
+        const auto newIndex = tetrahedrons[preyIndex].indices[0];
+        const auto connecting = updateInfo.connecting;
+
+        const auto [point, index] = updateInfo.connectionPoint;
+
+        const auto currentOldIndex = point;
+        if (newIndex == point) continue;
+        auto& otherNeighbours = lodGenerateInfo.graph[connecting];
+        for (auto& [connectingOther, typeOther] : neighbours)
+        {
+            if (typeOther != EdgeType::Point || connectingOther == connecting ||
+               !level.usageAfter[connectingOther]) continue;
+            auto value = std::ranges::find_if(otherNeighbours, [=](auto t) { return std::get<0>(t) == connectingOther; });
+
+            const auto isNeighbour = value != std::end(otherNeighbours);
+            if (isNeighbour) {
+                size_t count = 0;
+                for (const auto index : tetrahedrons[connecting].indices)
+                {
+                    const auto& indices = tetrahedrons[connectingOther].indices;
+                    if (std::ranges::find(indices, index) != std::end(indices)) count++;
+                }
+                assert(count <= 3);
+                assert(count > 0);
+                std::get<1>(*value) = (EdgeType)count;
+            }
+            else {
+                otherNeighbours.emplace_back(connectingOther, EdgeType::Point);
+            }
+        }
+    }
+
     if (level.lodTetrahedrons.empty()) {
         std::cout << "Warning: No preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
     }
