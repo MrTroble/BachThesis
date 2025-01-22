@@ -263,6 +263,7 @@ int main()
                     const bool isSelected = (currentSelected == i);
                     if (ImGui::Selectable(name.c_str(), isSelected) && currentType != PresetType::Default) {
                         icontext.settings = getSettingFromType(currentType);
+                        icontext.settings.activeModels.resize(vtkNames.size());
                         icontext.presetType = currentType;
                         updateVTKs();
                     }
