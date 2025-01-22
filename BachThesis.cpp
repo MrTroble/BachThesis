@@ -198,7 +198,7 @@ int main()
     const ScopeExit cleanFences([&]() { for (auto fence : fencesToCheck) icontext.device.destroy(fence); });
 
     const auto startTimeLoading = std::chrono::steady_clock::now();
-    std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", 
+    std::vector vtkNames = { "perf.vtk", "edge.vtk", "point.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk",
         //"Armadillo.vtk" 
     };
     std::vector<VTKFile> loadedVtkFiles = { };
@@ -207,6 +207,7 @@ int main()
     }
     std::vector<VTKFile> vtkFiles = { loadedVtkFiles[0] };
     std::vector<char>& active = icontext.settings.activeModels;
+    icontext.settings.activeModels.resize(vtkNames.size());
     active[0] = true;
     const ScopeExit cleanCrystal([&]() { for (auto& file : loadedVtkFiles) file.unload(icontext); });
     const auto endTimeLoading = std::chrono::steady_clock::now();
