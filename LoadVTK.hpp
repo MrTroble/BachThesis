@@ -241,6 +241,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         {
             // Every neighbour should be excluded from the same LOD Level
             usageForCurrentLOD[connecting] = 0;
+            for (const auto& [secondDegreeNeighbor, t] : lodGenerateInfo.graph[connecting]) {
+                usageForCurrentLOD[secondDegreeNeighbor] = 0;
+            }
             indexOfNeighbour++;
             if (type == EdgeType::Point) {
                 if (!lodGenerateInfo.previous[connecting]) continue;
