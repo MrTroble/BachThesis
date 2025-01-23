@@ -127,7 +127,7 @@ struct LODGenerateInfo {
     const std::vector<char>& previous;
     const std::vector<char>& outer;
     const std::vector<LODTetrahedron>& previousTets;
-    const TetGraph& graph;
+    TetGraph& graph;
     IContext& context;
     LodLevelFlag level;
     Heuristic heuristic;
@@ -141,7 +141,7 @@ inline LODLevel defaultLODLevel(IContext& context, const TetGraph& graph) {
 }
 
 inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector<glm::vec4>& vertices,
-    const std::vector<Tetrahedron>& tetrahedrons) {
+    std::vector<Tetrahedron>& tetrahedrons) {
 
     LODLevel level;
     level.usageAfter = lodGenerateInfo.previous;
@@ -158,6 +158,8 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         index++;
     }
 
+    std::vector<size_t> preyTetrahedron;
+    preyTetrahedron.reserve(COLAPSING_PER_LEVEL);
     for (size_t i = 0; i < lodGenerateInfo.graph.size(); i++)
     {
         if (level.lodTetrahedrons.size() == COLAPSING_PER_LEVEL)
@@ -184,7 +186,7 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             indexOfNeighbour++;
             if (type != EdgeType::Point) continue;
             const auto& other = tetrahedrons[connecting];
-            std::array<VertIndex, 3> usedForPlane;
+            std::array<VertIndex, 4> usedForPlane;
             size_t amountFound = 0;
             VertIndex otherPoint;
             VertIndex otherIndex;
@@ -199,13 +201,17 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
                 usedForPlane[amountFound++] = index;
             }
             connectingPoint[indexOfNeighbour - 1] = { otherPoint, otherIndex };
+            if (!lodGenerateInfo.previous[connecting]) continue;
             assert(amountFound == 3);
             // Test plane for flips
             const auto& point2 = vertices[usedForPlane[0]];
             const glm::vec3 v0 = vertices[usedForPlane[1]] - point2;
             const glm::vec3 v1 = vertices[usedForPlane[2]] - point2;
+            assert(v0 != glm::vec3(0));
+            assert(v1 != glm::vec3(0));
             const auto planeNormal = glm::normalize(glm::cross(v0, v1));
             const glm::vec3 oldVertex = vertices[otherPoint] - point2;
+            assert(oldVertex != glm::vec3(0));
             const auto signOld = glm::sign(glm::dot(planeNormal, oldVertex));
             const auto signNew = glm::sign(glm::dot(planeNormal, midPoint - glm::vec3(point2)));
             if (signOld != signNew) {
@@ -223,10 +229,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             {
                 const auto currentPoint = vertices[prey.indices[i]];
                 lodInfo.previous[i] = currentPoint;
-                // Update vertices for further LOD levels
-                vertices[prey.indices[i]] = all;
             }
         }
+        preyTetrahedron.push_back(i);
         level.usageAfter[preyIndex] = 0;
         usageForCurrentLOD[preyIndex] = 0;
         indexOfNeighbour = 0;
@@ -245,6 +250,46 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             level.usageAfter[connecting] = 0;
         }
     }
+
+    for (const auto& vertexUpdate : level.lodTetrahedrons)
+    {
+        vertices[vertexUpdate.tetrahedron.indices[0]] = vertexUpdate.next;
+    }
+    for (const auto& indexUpdate : level.lodLevelChanges)
+    {
+        tetrahedrons[indexUpdate.tetrahedronID].indices[indexUpdate.indexInTet] = indexUpdate.newIndex;
+    }
+
+    for (auto prey : preyTetrahedron)
+    {
+        const auto& neighbours = lodGenerateInfo.graph[prey];
+        for (const auto& [neighbor, type] : neighbours) {
+            if (!level.usageAfter[neighbor]) continue;
+            std::span tetrahedron(tetrahedrons[neighbor].indices);
+            for (const auto& [other, otherType] : neighbours) {
+                if (!level.usageAfter[other] || neighbor == other) continue;
+                size_t amount = 0;
+                for (auto index : tetrahedrons[other].indices) {
+                    if (std::ranges::find(tetrahedron, index) == tetrahedron.end()) continue;
+                    amount++;
+                }
+                if (amount == 0)  continue;
+                if (amount > 3) {
+                    level.usageAfter[other] = 0;
+                    continue;
+                }
+                auto& neighborList = lodGenerateInfo.graph[neighbor];
+                auto foundItem = std::ranges::find_if(neighborList, [=](auto& tuple) { return std::get<0>(tuple) == other;});
+                if (foundItem == std::end(neighborList)) {
+                    neighborList.emplace_back(other, (EdgeType)amount);
+                }
+                else {
+                    std::get<1>(*foundItem) = (EdgeType)amount;
+                }
+            }
+        }
+    }
+
     if (level.lodTetrahedrons.empty()) {
         std::cout << "Warning: No preys found for model " << lodGenerateInfo.name << " at level " << stringLODLevel(lodGenerateInfo.level) << std::endl;
     }
@@ -432,7 +477,7 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
         sizesRequested[i] = stateSize;
         const auto& current = levelToGenerate[i - 3];
         sizesRequested[i + LOD_COUNT] = current.lodTetrahedrons.size() * sizeof(LODTetrahedron);
-        sizesRequested[i + LOD_COUNT*2] = current.lodLevelChanges.size() * sizeof(LODLevelChange);
+        sizesRequested[i + LOD_COUNT * 2] = current.lodLevelChanges.size() * sizeof(LODLevelChange);
     }
 
     VTKSizeArray sizesActual;
@@ -499,9 +544,9 @@ VTKFile loadVTK(const std::string& vtkFile, IContext& context) {
             writeUpdateInfos.push_back(writeData);
         }
 
-        const auto dataChangeBuffer = localBuffers[i + LOD_COUNT*2 + 4];
+        const auto dataChangeBuffer = localBuffers[i + LOD_COUNT * 2 + 4];
         if (dataChangeBuffer) {
-            auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT*2 - 2];
+            auto& tetrahedrons = lodBufferInfos[i + LOD_COUNT * 2 - 2];
             tetrahedrons = vk::DescriptorBufferInfo{ dataChangeBuffer , 0, VK_WHOLE_SIZE };
             const vk::WriteDescriptorSet writeData(currentDescriptor, 2, 0, vk::DescriptorType::eStorageBuffer, {}, tetrahedrons);
             writeUpdateInfos.push_back(writeData);
