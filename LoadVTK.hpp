@@ -20,7 +20,7 @@ constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 using TetIndex = uint32_t;
 
 enum class EdgeType : uint32_t {
-    Point = 1, Edge = 2, Face = 3
+   None = 0, Point = 1, Edge = 2, Face = 3, OverPromotion = 4
 };
 
 using Connection = std::tuple<TetIndex, EdgeType>;
@@ -185,8 +185,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
         {
             indexOfNeighbour++;
             if (type != EdgeType::Point) continue;
+            if (!lodGenerateInfo.previous[connecting]) continue;
             const auto& other = tetrahedrons[connecting];
-            std::array<VertIndex, 4> usedForPlane;
+            std::array<VertIndex, 3> usedForPlane;
             size_t amountFound = 0;
             VertIndex otherPoint;
             VertIndex otherIndex;
@@ -198,11 +199,11 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
                     otherIndex = i;
                     continue;
                 }
+                assert(amountFound < 3);
                 usedForPlane[amountFound++] = index;
             }
-            connectingPoint[indexOfNeighbour - 1] = { otherPoint, otherIndex };
-            if (!lodGenerateInfo.previous[connecting]) continue;
             assert(amountFound == 3);
+            connectingPoint[indexOfNeighbour - 1] = { otherPoint, otherIndex };
             // Test plane for flips
             const auto& point2 = vertices[usedForPlane[0]];
             const glm::vec3 v0 = vertices[usedForPlane[1]] - point2;
@@ -242,7 +243,9 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
             usageForCurrentLOD[connecting] = 0;
             indexOfNeighbour++;
             if (type == EdgeType::Point) {
+                if (!lodGenerateInfo.previous[connecting]) continue;
                 const auto [point, index] = connectingPoint[indexOfNeighbour - 1];
+                if(index == newIndex) continue;
                 level.lodLevelChanges.emplace_back(index, point, newIndex, connecting);
                 continue;
             }
@@ -276,7 +279,6 @@ inline LODLevel loadLODLevel(const LODGenerateInfo& lodGenerateInfo, std::vector
                 if (amount == 0)  continue;
                 if (amount > 3) {
                     level.usageAfter[other] = 0;
-                    continue;
                 }
                 auto& neighborList = lodGenerateInfo.graph[neighbor];
                 auto foundItem = std::ranges::find_if(neighborList, [=](auto& tuple) { return std::get<0>(tuple) == other;});
