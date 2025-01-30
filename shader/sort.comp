@@ -193,7 +193,7 @@ bool getTestPoint(vec3[4] screenSpace1, uint[5] index1, vec3[4] screenSpace2, ui
               const float sign2Begin = sign(aboveLine(begin2, end2, begin1));
               const float sign2End = sign(aboveLine(begin2, end2, end1));
               if(sign2Begin != sign2End) {
-                edgesIntersected[foundAmount] = i2;
+                edgesIntersected[foundAmount++] = i2;
                 if(foundAmount == 2) break;
               }
            }
