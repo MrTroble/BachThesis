@@ -39,21 +39,21 @@ float distToLine(vec2 l1, vec2 l2, vec2 p) {
 }
 
 bool checkIn(vec3 inPoints[4], uint[5] index, vec2 p) {
-    const float s1 = sign(aboveLine(inPoints[index[0]].xy, inPoints[index[1]].xy, p));
-    const float s2 = sign(aboveLine(inPoints[index[1]].xy, inPoints[index[2]].xy, p));
-    if(s2 != s1)
+    float s1 = sign(aboveLine(inPoints[index[0]].xy, inPoints[index[1]].xy, p));
+    float s2 = sign(aboveLine(inPoints[index[1]].xy, inPoints[index[2]].xy, p));
+    if(s2 != s1 || s1 == 0 || s2 == 0)
         return false;
     if(index[4] == 3) {
-        const float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[0]].xy, p));
-        if(s2 != s3)
+        float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[0]].xy, p));
+        if(s2 != s3 || s3 == 0)
             return false;
         return true;
     }
     const float s3 = sign(aboveLine(inPoints[index[2]].xy, inPoints[index[3]].xy, p));
-    if(s2 != s3)
+    if(s2 != s3 || s3 == 0)
         return false;
     const float s4 = sign(aboveLine(inPoints[index[3]].xy, inPoints[index[0]].xy, p));
-    if(s4 != s3)
+    if(s4 != s3 || s4 == 0)
         return false;
     return true;
 }
