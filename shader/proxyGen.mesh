@@ -5,8 +5,6 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
-layout (local_size_x=128) in;
-
 layout (triangles) out;
 layout (max_vertices=5, max_primitives=4) out;
 
@@ -38,11 +36,6 @@ void main() {
     vec3 primColorOut = vec3(0.0f, 0.0f, 0.0f);
     primColorOut[currentClass] = 1.0f;
    
-    lambdasOut[0] = primColorOut;
-    lambdasOut[1] = primColorOut;
-    lambdasOut[2] = primColorOut;
-    lambdasOut[3] = primColorOut;
-
     uint mostLeft = 0;
     float currentX = FLT_MAX;
     uint mostRight = 0;
@@ -117,6 +110,8 @@ void main() {
             }
         }
 
+        SetMeshOutputsEXT(5, 4);
+
         const vec2 P1 = pointsToUse[lineOne.x].xy;
         const vec2 P0 = pointsToUse[lineTwo.x].xy;
         const vec2 dP31 = pointsToUse[lineOne.y].xy - P1;
@@ -148,8 +143,9 @@ void main() {
 
         depthsMinMax[4] = vec4(midpoint, min(oneZ0, oneZ1), max(oneZ0, oneZ1));
 
-        SetMeshOutputsEXT(5, 4);
     } else {
+        SetMeshOutputsEXT(4, 3);
+
         const float[] lambdaArray = {lambdas.x, lambdas.y, lambda2};
         float z1 = 0;
         for(uint x = 0; x < 3; x++) {
@@ -168,6 +164,10 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
 
-        SetMeshOutputsEXT(4, 3);
     }
+
+    lambdasOut[0] = primColorOut;
+    lambdasOut[1] = primColorOut;
+    lambdasOut[2] = primColorOut;
+    lambdasOut[3] = primColorOut;
 }

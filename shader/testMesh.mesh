@@ -3,8 +3,6 @@
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_fragment_shading_rate : disable
 
-layout (local_size_x=128) in;
-
 layout (lines) out;
 layout (max_vertices=4, max_primitives=6) out;
 
@@ -22,6 +20,8 @@ layout (binding=2) buffer Vertex {
 
 void main() {
     const uvec4 tetrahedron = index.data[gl_WorkGroupID.x];
+    SetMeshOutputsEXT(4, 6);
+
     gl_PrimitiveLineIndicesEXT[0] = uvec2(0, 1);
     gl_PrimitiveLineIndicesEXT[1] = uvec2(0, 2);
     gl_PrimitiveLineIndicesEXT[2] = uvec2(0, 3);
@@ -35,5 +35,4 @@ void main() {
         vec4 projection = camera.proj * screen;
         gl_MeshVerticesEXT[x].gl_Position = projection;
     }
-    SetMeshOutputsEXT(4, 6);
 }
