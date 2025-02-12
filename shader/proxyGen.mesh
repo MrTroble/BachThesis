@@ -42,7 +42,6 @@ void main() {
     float currentXRight = -FLT_MAX;
     for(uint x = 0; x < 4; x++) {
         const vec4 projection = pointsToUse[x];
-        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0.0f, 1.0f);
         if(currentX > projection.x) {
             mostLeft = x;
             currentX = projection.x;
@@ -164,6 +163,11 @@ void main() {
         gl_PrimitiveTriangleIndicesEXT[1] = uvec3(triangleOuter[1], triangleOuter[2], otherDist);
         gl_PrimitiveTriangleIndicesEXT[2] = uvec3(triangleOuter[2], triangleOuter[0], otherDist);
 
+    }
+
+    for(uint x = 0; x < 4; x++) {
+        const vec4 projection = pointsToUse[x];
+        gl_MeshVerticesEXT[x].gl_Position = vec4(projection.xy, 0.0f, 1.0f);
     }
 
     lambdasOut[0] = primColorOut;

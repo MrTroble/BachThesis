@@ -199,7 +199,7 @@ int main()
 
     const auto startTimeLoading = std::chrono::steady_clock::now();
     std::vector vtkNames = { "perf.vtk", "crystal.vtk", "cube.vtk", "bunny.vtk", "edge.vtk", "point.vtk",
-        //"Armadillo.vtk" 
+        "Armadillo.vtk"
     };
     std::vector<VTKFile> loadedVtkFiles = { };
     for (const auto& value : vtkNames) {

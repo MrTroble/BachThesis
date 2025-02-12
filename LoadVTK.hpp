@@ -9,14 +9,11 @@
 
 #include "Context.hpp"
 
-constexpr uint32_t MAX_WORK_GROUPS = 256;
-
 using VertIndex = uint32_t;
 
 struct Tetrahedron {
     VertIndex indices[4];
 };
-constexpr uint32_t BUFFER_SLAB_AMOUNT = MAX_WORK_GROUPS * sizeof(Tetrahedron);
 using TetIndex = uint32_t;
 
 enum class EdgeType : uint32_t {
@@ -56,9 +53,9 @@ struct LODLevel {
 constexpr size_t COLAPSING_PER_LEVEL = 250u;
 
 enum class LodLevelFlag {
-    None, L1, L2, L3
+    None, L1, L2, L3, L4, L5, L6, L7, L8
 };
-constexpr size_t LOD_COUNT = 4;
+constexpr size_t LOD_COUNT = 8;
 enum class Heuristic {
     Random
 };
@@ -69,6 +66,12 @@ inline std::string stringLODLevel(const LodLevelFlag flag) {
     case LodLevelFlag::L1: return "L1";
     case LodLevelFlag::L2: return "L2";
     case LodLevelFlag::L3: return "L3";
+    case LodLevelFlag::L4: return "L4";
+    case LodLevelFlag::L5: return "L5";
+    case LodLevelFlag::L6: return "L6";
+    case LodLevelFlag::L7: return "L7";
+    case LodLevelFlag::L8: return "L8";
+
     default:
         throw std::runtime_error("Wrong LODLevelFlag!");
     }

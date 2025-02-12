@@ -35,8 +35,6 @@ inline void destroyPrimaryCommandBufferContext(IContext& context) {
 }
 
 inline void recordMeshPipeline(const VTKFile& vtk, vk::CommandBuffer currentBuffer, IContext& context) {
-    const size_t workGroups = vtk.amountOfTetrahedrons / MAX_WORK_GROUPS;
-    const size_t lastGroupAmount = vtk.amountOfTetrahedrons - workGroups * MAX_WORK_GROUPS;
     currentBuffer.drawMeshTasksEXT(vtk.amountOfTetrahedrons, 1, 1, context.dynamicLoader);
 }
 
