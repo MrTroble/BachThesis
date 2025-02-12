@@ -273,19 +273,7 @@ void compareAndSwap(uint v1, uint v2) {
     toSort[v2] = temp;
 }
 
-void runTests() {
-    {
-        vec3 inPoints[4] = { {0.2f, 0.2f, 1.0f}, {0.4f, 0.2f, 1.0f}, {0.4f, 0.4f, 1.0f}, {0.2f, 0.4f, 1.0f} };
-        uint[5] index = { 0, 1, 2, 3, 3};
-        bool testIn1 = checkIn(inPoints, index, vec2(0.35f, 0.3f)) == true;
-        bool testIn2 = checkIn(inPoints, index, vec2(0.25f, 0.35f)) == false;
-        index[4] = 4;
-        bool testIn3 = checkIn(inPoints, index, vec2(0.25f, 0.35f)) == true;
-    }
-}
-
 void main() {
-    runTests();
     uint ij = gl_WorkGroupID.x ^ j;
     if (ij > gl_WorkGroupID.x) {
         compareAndSwap(gl_WorkGroupID.x, ij);
