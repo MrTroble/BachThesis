@@ -300,7 +300,7 @@ int main()
                 ImGui::SliderFloat2("Planes", &icontext.settings.planes.x, 0.001f, 1000.0f);
                 ImGui::SliderFloat("FOV", &icontext.settings.FOV, 0.1f, 3.0f);
                 ImGui::SliderFloat3("Position", &icontext.settings.position.x, 0, 10.0f);
-                ImGui::SliderFloat2("Rotation", &icontext.settings.rotationAndZoom.x, -3.0f, 3.0f);
+                ImGui::SliderFloat2("Rotation", &icontext.settings.rotationAndZoom.x, 0.0f, INTERNAL_PI);
                 ImGui::SliderFloat("Zoom", &icontext.settings.rotationAndZoom.z, 0, 10.0f);
                 ImGui::SliderFloat3("Color Factor", &icontext.settings.colorADepth.x, 0, 1.0f);
                 ImGui::SliderFloat("Depth Factor", &icontext.settings.colorADepth.w, 0, 10.0f);

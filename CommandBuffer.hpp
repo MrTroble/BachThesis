@@ -63,7 +63,7 @@ inline void rerecordPrimary(IContext& context, uint32_t currentImage, const std:
         {
             const auto lodUpdateAmount = vtk.lodUpdateAmount[lodToUse];
             if (context.changedLOD && lodUpdateAmount != 0) {
-                const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[context.changedLOD == 1 ? lodToUse: nextLOD] };
+                const std::array descriptorsToUse = { vtk.descriptor[0], vtk.descriptor[context.changedLOD == 1 ? lodToUse : nextLOD] };
                 currentBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, context.defaultPipelineLayout, 0, descriptorsToUse, {});
                 currentBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, context.computeLODUpdatePipeline);
                 currentBuffer.dispatch(lodUpdateAmount, 1, 1);
@@ -375,15 +375,23 @@ struct CameraInfo {
     uint32_t type;
 };
 
-inline void updateCamera(IContext& context) {
+constexpr float INTERNAL_PI = 3.14159265358979323846  /* pi */;
+
+inline void updateCamera(IContext & context) {
     CameraInfo* cameraMap = (CameraInfo*)context.device.mapMemory(context.cameraStagingMemory, 0, VK_WHOLE_SIZE);
     const float aspect = context.currentExtent.width / (float)context.currentExtent.height;
     auto projectionMatrix = glm::perspective(context.settings.FOV, aspect, context.settings.planes.x, context.settings.planes.y);
     projectionMatrix[1][1] *= -1;
     cameraMap->proj = projectionMatrix;
-    glm::vec3 lookAt = glm::vec3(glm::rotate(glm::identity<glm::mat4>(), context.settings.rotationAndZoom.x, glm::vec3{ 0, 1, 0 }) * glm::vec4{ 1, 0, 0, 1 });
-    lookAt = glm::rotate(glm::identity<glm::mat4>(), context.settings.rotationAndZoom.y, glm::vec3{ 0, 0, 1 }) * glm::vec4(lookAt, 1);
-    lookAt = glm::normalize(lookAt) * context.settings.rotationAndZoom.z;
+    float yaw = context.settings.rotationAndZoom.x;
+    float pitch = context.settings.rotationAndZoom.y - INTERNAL_PI*0.5;
+    glm::vec3 lookAt;
+    lookAt.x = std::cos(yaw) * std::cos(pitch);
+    lookAt.y = std::sin(pitch);
+    lookAt.z = std::sin(yaw) * std::cos(pitch);
+    lookAt = glm::normalize(lookAt);
+    lookAt *= context.settings.rotationAndZoom.z;
+
     cameraMap->view = glm::lookAt(context.settings.position + lookAt, context.settings.position, glm::vec3{ 0.0f, 1.0f, 0.0f });
     cameraMap->model = glm::identity<glm::mat4>();
     cameraMap->whole = projectionMatrix * cameraMap->view * cameraMap->model;
