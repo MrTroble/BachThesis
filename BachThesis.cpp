@@ -227,8 +227,13 @@ int main()
         }
     };
 
+    auto dTime = std::chrono::steady_clock::now();
     while (!glfwWindowShouldClose(icontext.window))
     {
+        const auto current = std::chrono::steady_clock::now();
+        const auto durationOfFrame = current - dTime;
+        const auto deltaTime = durationOfFrame.count() * 1e-9f;
+        dTime = current;
         glfwPollEvents();
         if (glfwGetWindowAttrib(icontext.window, GLFW_ICONIFIED)) {
             continue;
@@ -246,6 +251,11 @@ int main()
             continue;
         }
 
+        if (icontext.settings.animate) {
+            const auto addition = icontext.settings.speed * deltaTime * 10.0f;
+            const auto addedValue = icontext.settings.currentLOD + addition;
+            icontext.settings.currentLOD = std::max(std::min(addedValue, 6.9f), 0.0f);
+        }
         updateCamera(icontext);
 
         ImGui_ImplVulkan_NewFrame();
@@ -318,6 +328,8 @@ int main()
             if (ImGui::CollapsingHeader("LOD")) {
                 ImGui::SliderFloat("Current LOD", &icontext.settings.currentLOD, 0.0f, -0.1f + LOD_COUNT - 1.0f);
                 ImGui::Checkbox("Use LOD", &icontext.settings.useLOD);
+                ImGui::Checkbox("Animate", &icontext.settings.animate);
+                ImGui::SliderFloat("Speed", &icontext.settings.speed, -0.1f, 0.1f);
             }
             ImGui::Checkbox("Sort primitives", &icontext.settings.sortingOfPrimitives);
         }

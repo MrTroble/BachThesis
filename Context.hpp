@@ -64,6 +64,8 @@ struct ContextSetting {
     // LOD
     float currentLOD = 0.0f;
     bool useLOD = false;
+    bool animate = false;
+    float speed = 0.1f;
 };
 
 enum class PresetType {
