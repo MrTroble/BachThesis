@@ -69,7 +69,7 @@ struct ContextSetting {
 };
 
 enum class PresetType {
-    Default, BunnyTest, SortingSmall
+    Default, BunnyTest, LODTest, SortingSmall
 };
 constexpr size_t PRESET_TYPE_AMOUNT = (size_t)PresetType::SortingSmall + 1;
 inline std::string to_string(PresetType type) {
@@ -81,6 +81,8 @@ inline std::string to_string(PresetType type) {
         return "Bunny test";
     case PresetType::SortingSmall:
         return "Sorting";
+    case PresetType::LODTest:
+        return "LOD Test";
     default:
         break;
     }
@@ -103,6 +105,13 @@ inline ContextSetting getSettingFromType(PresetType type) {
         setting.activeModels[0] = true;
         setting.sortingOfPrimitives = true;
         setting.type = PipelineType::ColorNoDepth;
+        return setting;
+    case PresetType::LODTest:
+        setting.colorADepth.w = 20.0f;
+        setting.position = { -0.017f, 0.110, -0.001 };
+        setting.rotationAndZoom = { 1.2f, 1.2f, 0.22f };
+        setting.activeModels[3] = true;
+        setting.type = PipelineType::Color;
         return setting;
     default:
         setting.activeModels[0] = true;
